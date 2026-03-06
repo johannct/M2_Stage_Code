@@ -113,7 +113,7 @@ def plot_fit(x_fit, y_fit, values, model, **kwargs):
 
 
 ## Fit functions:
-def fit_minuit(x_fit, y_fit, y_err, model, init, par_name, get_fig=False, plot_fig=True, **kwargs):
+def fit_minuit(x_fit, y_fit, y_err, model, init, par_name, bounds=None, fixed=[], get_fig=False, plot_fig=True, **kwargs):
     '''Fit data with iminuit and the least squares methode, and return the corresponding Minuit() instance.
     Also show the figure with both data and fit, by using plot_fit(x_fit, y_fit, values, model, **kwargs).
 
@@ -127,8 +127,10 @@ def fit_minuit(x_fit, y_fit, y_err, model, init, par_name, get_fig=False, plot_f
     Optionnal parameters:
     - get_fig: if True, return also the fig, ax variables from the data&fit figure. By default, get_fig=False.
     '''
-    least_squares = LeastSquares(x_fit, y_fit, y_err, model)
-    m = Minuit(least_squares, *init, name=par_name)
+    cost_func = kwargs.pop("cost_func", LeastSquares(x_fit, y_fit, y_err, model))
+    m = Minuit(cost_func, *init, name=par_name)
+    if bounds: m.limits = bounds
+    if fixed: m.fixed[fixed] = True
     m.migrad()       # finds minimum of least_squares function
     m.hesse()        # accurately computes uncertainties
     try: m.minos()   # computes non symetrics uncertainties
