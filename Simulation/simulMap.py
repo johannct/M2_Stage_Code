@@ -39,6 +39,55 @@ def get_RADEC2NSource(NSIDE, NSource_px_th):
     return NSource_px, RA, DEC
 
 
+def proba_schechter_mag(M, M_star, alpha):
+    """Compute the relative probability of a magnitude M.
+    M_star is the caracteristic magnitude of Schechter's luminosity function."""
+    L_ratio = 10**(0.4 * (M_star - M)) #Conversion magnitude -> relative luminosity L/L*
+    return (L_ratio**alpha) * np.exp(-L_ratio)
+
+
+def generate_schechter_magnitudes(N, M_min=-23, M_max=-15, M_star=-20.44, alpha=-1.1):
+    """Generate N randomized absolute magnitudes, by using a reject test and Schechter's law."""
+    magnitudes = []
+    while len(magnitudes) < N:
+        M_test = np.random.uniform(M_min, M_max)
+        p_test = np.random.uniform(0, 1) #Probability for rejet test
+        if p_test < proba_schechter_mag(M_test, M_star, alpha): magnitudes.append(M_test)         
+    return np.array(magnitudes)
+
+
+def get_dL(zi, H0=67.4, Om=0.315, Ol=0.685, c=3e8):
+    '''Compute the luminosity distance depending on the redshift z, the Hubble constant H0, the cosmological parameters Om and Ol, and the speed of ligt c.'''
+    inv_Ez = lambda zp: 1.0 / np.sqrt(Om * (1 + zp)**3 + Ol)
+    integral, _ = quad(inv_Ez, 0, zi)
+    return (c / H0) * (1 + zi) * integral
+
+
+def generate_galaxies(N, z_min=0.01, z_max=2.0, M_min=-23, M_max=-15, M_star=-20.44, alpha=-1.1, sigma_M_star=1.5, rejectTest_M=False, only_coord=False, **kwargs):
+    #Cosmological Parameters  (Planck 2018):
+    H0 = kwargs.get('H0', 67.4)
+    Om = kwargs.get('Om', 0.315)
+    Ol = kwargs.get('Ol', 0.685)
+    c = kwargs.get('c', 3e5) #speed of ligt in km/s (because H0 is in Km/s/Mpc)
+    M_sun = kwargs.get('M_sun', 4.83) #Absolute magnitude of Sun
+
+    #Coord ra, dec, z:
+    ra = np.random.uniform(0, 360, N)
+    dec = np.random.uniform(-1, 1, N)
+    dec = np.degrees(np.arcsin(dec))
+    z = np.random.uniform(z_min, z_max, N) #Redshift
+    if only_coord: return ra, dec, z
+
+    #Other data:
+    dL_mpc = np.array([get_dL(zi, H0, Om, Ol, c) for zi in z]) #luminosity distance in Mpc
+    #Absolute magnitudes:
+    if rejectTest_M: M = generate_schechter_magnitudes(N, M_min, M_max, M_star, alpha)
+    else: M = np.random.normal(M_star, sigma_M_star, N)
+    m = M + 5*np.log10(dL_mpc) + 25 #Aparent magnitudes
+    L = 10**(0.4 * (M_sun - M)) #luminosities
+    return ra, dec, z, m, M, L, dL_mpc
+
+
 ## Plot functions:
 def get_savefig(fig, output_path, sufix, **kwargs):
     """Save the figure fig; several format for the images can be chosen in the same time, by inputing a tuple or a list in the parmateer format.
