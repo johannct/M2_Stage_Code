@@ -4,6 +4,8 @@
 import numpy as np
 import healpy as hp
 import matplotlib.pyplot as plt
+import astropy.units as u
+from astropy.coordinates import SkyCoord
 
 from iminuit import Minuit
 from iminuit.cost import LeastSquares
@@ -190,8 +192,60 @@ def fit_minuit(x_fit, y_fit, y_err, model, init, par_name, bounds=None, fixed=[]
     if get_fig: return m, fig, ax
     else: return m
 
+
+def fit_dipole_err(model, map, init, names, bounds=([0, 0, -90], [1, 360, 90]), fixed=[], fit_mode="minuit", **kwargs):
+    """Reteurn the result of a dipole fit, depending on a model. Can use either iminuit or scipy."""
+    map_errY = np.sqrt(np.abs(map)) 
+    
+    npix = len(map) #nb. of pixels
+    ipix = np.arange(npix) #indices of each pixel
+    #print("ipix =", ipix)
+    nside= hp.npix2nside(npix)
+
+    if fit_mode == "minuit": return fit_minuit(ipix, map, map_errY, model, init, names, list(zip(bounds[0], bounds[1])), fixed, title="Fit dipole", xlabel="Pixels")
+    else: return curve_fit(model, ipix, map, p0=init, bounds=bounds, sigma= map_errY)
+
     
 ## Fit models:
 def gauss(x,A,mu,sigma):
     '''Return the usual gauss function of x, depending on the amplitude A, the mean mu, and the std sigma.'''
     return (A / (sigma*np.sqrt(2*np.pi)))* np.exp(-np.square(x-mu)/(2*sigma**2))
+
+
+def apply_dipole_Alb(map, A, l, b, nest):
+    """Return the measured map, when it is modified by a a dipole with amplitude A and direction l, b, depending on the true map."""
+    npix = len(map) #nb. of pixels
+    nside= hp.npix2nside(npix)
+    ipix = np.arange(npix)
+    dipole = SkyCoord(l=l*u.degree, b=b*u.degree, frame='galactic')
+    u_dipole = dipole.cartesian.xyz.value
+    ra, dec = hp.pix2ang(nside, ipix, nest=nest, lonlat=True)
+    sources = SkyCoord(l=ra*u.degree, b=dec*u.degree, frame="galactic")
+    u_source = sources.cartesian.xyz.value
+    return A * np.dot(u_dipole, u_source)
+
+
+def apply_dipole_ARaDec(map, A, ra, dec, nest):
+    """Return the measured map, when it is modified by a a dipole with amplitude A and direction l, b, depending on the true map."""
+    npix = len(map) #nb. of pixels
+    nside= hp.npix2nside(npix)
+    ipix = np.arange(npix)
+    dipole = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, frame="icrs")
+    u_dipole = dipole.cartesian.xyz.value
+    raS, decS = hp.pix2ang(nside, ipix, nest=nest, lonlat=True)
+    sources = SkyCoord(ra=raS*u.degree, dec=decS*u.degree, frame="icrs")
+    u_source = sources.cartesian.xyz.value
+    return A * np.dot(u_dipole, u_source)
+
+
+def apply_dipole_MD(map, M, D0, D1, D2, nest, frame='icrs'):
+    """Returned the measured map, when it is modified by a a monopole M and a kinematic dipole D, depending on the true map."""
+    if frame == 'icrs': return M + apply_dipole_ARaDec(map, D0, D1, D2, nest)
+    elif frame == 'galactic': return M + apply_dipole_Alb(map, D0, D1, D2, nest)
+    elif frame == 'cartesian':
+        npix = len(map) #nb. of pixels
+        nside = hp.npix2nside(npix)
+        ipix = np.arange(npix)
+        u_source = hp.pix2vec(nside, ipix, nest)
+        D = np.array([D0, D1, D2])
+        return M + np.dot(D, u_source)
