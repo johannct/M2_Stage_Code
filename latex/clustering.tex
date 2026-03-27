@@ -1,0 +1,166 @@
+\section{Approximation simplifiée du spectre angulaire $C_\ell$}
+
+\subsection{Expression exacte}
+
+Le spectre de puissance angulaire des fluctuations projetées s'écrit, dans une approximation de type Limber :
+
+\begin{equation}
+C_\ell = \int dz ; \frac{H(z)}{r^2(z)} ; n^2(z); P!\left(k=\frac{\ell}{r(z)}, z\right),
+\end{equation}
+
+où :
+\begin{itemize}
+\item $n(z)$ est la distribution normalisée en redshift,
+\item $r(z)$ est la distance comobile,
+\item $H(z)$ est le taux d'expansion,
+\item $P(k,z)$ est le spectre de puissance 3D de la matière.
+\end{itemize}
+
+Cette expression est celle calculée numériquement par des codes comme \texttt{CCL}.
+
+---
+
+\subsection{Objectif de la simplification}
+
+Nous cherchons à comprendre comment le dipôle de clustering (i.e. $C_1$) dépend de la distribution en redshift $n(z)$, en particulier sous un cut $z > z_{\min}$.
+
+L'objectif n'est pas de reproduire précisément $C_\ell$, mais d'isoler sa dépendance principale en $n(z)$.
+
+---
+
+\subsection{Approximation 1 : séparation du spectre de puissance}
+
+On suppose que le spectre de puissance peut être séparé en une dépendance en redshift et en échelle :
+
+\begin{equation}
+P(k,z) \simeq D^2(z), P(k),
+\end{equation}
+
+où $D(z)$ est le facteur de croissance linéaire.
+
+Si $D(z)$ varie lentement sur le support de $n(z)$, on peut l'absorber dans une constante de normalisation :
+
+\begin{equation}
+P(k,z) \approx P(k) \times \text{const}.
+\end{equation}
+
+---
+
+\subsection{Approximation 2 : échelle effective}
+
+L'intégrale contient une dépendance en $k = \ell / r(z)$.
+On approxime cette dépendance en introduisant une distance effective $r_{\rm eff}$ telle que :
+
+\begin{equation}
+k \approx \frac{\ell}{r_{\rm eff}}.
+\end{equation}
+
+Cette approximation revient à supposer que la projection est dominée par une échelle caractéristique.
+
+On obtient alors :
+
+\begin{equation}
+C_\ell \propto P!\left(\frac{\ell}{r_{\rm eff}}\right)
+\int dz ; \frac{n^2(z)}{r^2(z)}.
+\end{equation}
+
+---
+
+\subsection{Approximation 3 : forme du spectre de puissance}
+
+À grande échelle (petits $k$), le spectre de puissance de la matière suit approximativement une loi de puissance :
+
+\begin{equation}
+P(k) \propto k^{n_{\rm eff}},
+\end{equation}
+
+avec un indice effectif typique :
+
+\begin{equation}
+n_{\rm eff} \approx -1.2.
+\end{equation}
+
+Ce comportement provient de la combinaison :
+\begin{itemize}
+\item du spectre primordial ($n_s \simeq 1$),
+\item de la fonction de transfert (suppression aux grandes échelles),
+\item de la croissance des structures.
+\end{itemize}
+
+---
+
+\subsection{Passage à la dépendance en $\ell$}
+
+En remplaçant $k = \ell / r_{\rm eff}$, on obtient :
+
+\begin{equation}
+P!\left(\frac{\ell}{r_{\rm eff}}\right)
+\propto \left(\frac{\ell}{r_{\rm eff}}\right)^{n_{\rm eff}}
+= r_{\rm eff}^{-n_{\rm eff}} , \ell^{n_{\rm eff}}.
+\end{equation}
+
+Le facteur $r_{\rm eff}^{-n_{\rm eff}}$ étant constant, il peut être absorbé dans la normalisation globale.
+
+Ainsi :
+
+\begin{equation}
+C_\ell \propto \ell^{n_{\rm eff}} ;
+\int dz ; \frac{n^2(z)}{r^2(z)}.
+\end{equation}
+
+En utilisant $n_{\rm eff} \approx -1.2$, on obtient :
+
+\begin{equation}
+C_\ell \propto \ell^{-1.2} ;
+\int dz ; \frac{n^2(z)}{r^2(z)}.
+\end{equation}
+
+---
+
+\subsection{Interprétation physique}
+
+L'expression obtenue montre que :
+
+\begin{itemize}
+\item la \textbf{forme en $\ell$} est fixée par le spectre de puissance 3D,
+\item l'\textbf{amplitude} est entièrement contrôlée par :
+\begin{equation}
+\int dz ; \frac{n^2(z)}{r^2(z)}.
+\end{equation}
+\end{itemize}
+
+Cette intégrale a une interprétation claire :
+\begin{itemize}
+\item le terme $n^2(z)$ provient du fait que l'on corrèle des paires d'objets,
+\item le facteur $1/r^2(z)$ traduit la dilution géométrique des structures projetées.
+\end{itemize}
+
+---
+
+\subsection{Conséquence pour le dipôle}
+
+Le dipôle de clustering est relié à $C_1$ par :
+
+\begin{equation}
+d_{\rm RMS} = \sqrt{\frac{3C_1}{4\pi}}.
+\end{equation}
+
+Ainsi, toute variation de $n(z)$ (par exemple un cut $z > z_{\min}$) agit directement sur :
+
+\begin{equation}
+C_1 \propto \int dz ; \frac{n^2(z)}{r^2(z)}.
+\end{equation}
+
+En particulier, supprimer les faibles redshifts (petits $r$) réduit fortement cette intégrale, ce qui diminue rapidement le dipôle induit par le clustering.
+
+---
+
+\subsection{Résumé}
+
+Le modèle simplifié repose donc sur la factorisation :
+
+\begin{equation}
+C_\ell \approx \left[\int dz ; \frac{n^2(z)}{r^2(z)}\right] \times \ell^{-1.2},
+\end{equation}
+
+qui capture correctement la dépendance du dipôle de clustering en fonction de la distribution en redshift, tout en restant beaucoup plus simple que le calcul complet.
