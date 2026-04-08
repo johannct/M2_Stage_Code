@@ -310,14 +310,16 @@ def apply_dipole_ARaDec(map, A, ra, dec, nest):
     return A * np.dot(u_dipole, u_source)
 
 
-def apply_dipole_MD(map, M, D0, D1, D2, nest, frame='icrs'):
+def apply_dipole_MD(map, M, D0, D1, D2, nest, frame='icrs', contrast=True):
     """Returned the measured map, when it is modified by a a monopole M and a kinematic dipole D, depending on the true map."""
-    if frame == 'icrs': return M + apply_dipole_ARaDec(map, D0, D1, D2, nest)
-    elif frame == 'galactic': return M + apply_dipole_Alb(map, D0, D1, D2, nest)
+    if frame == 'icrs': Acostheta = apply_dipole_ARaDec(map, D0, D1, D2, nest)
+    elif frame == 'galactic': Acostheta = apply_dipole_Alb(map, D0, D1, D2, nest)
     elif frame == 'cartesian':
         npix = len(map) #nb. of pixels
         nside = hp.npix2nside(npix)
         ipix = np.arange(npix)
         u_source = hp.pix2vec(nside, ipix, nest)
         D = np.array([D0, D1, D2])
-        return M + np.dot(D, u_source)
+        Acostheta = np.dot(D, u_source)
+    if contrast: return M + Acostheta
+    else: return M*(1 + Acostheta)
