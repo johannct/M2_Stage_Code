@@ -12,7 +12,8 @@ from ulid import ULID
 from iminuit import Minuit
 from iminuit.cost import LeastSquares
 
-from utile_fitsFile import *
+try: from utile_fitsFile import *
+except: from Simulation.utile_fitsFile import *
 
 
 ### Functions definition:
@@ -207,6 +208,8 @@ def fit_minuit(x_fit, y_fit, y_err, model, init, par_name, bounds=None, fixed=[]
     - get_fig: if True, return also the fig, ax variables from the data&fit figure. By default, get_fig=False.
     '''
     verbose = kwargs.pop('verbose', True)
+    weights = kwargs.pop('weights', None)
+    if weights is not None: y_err = y_err/np.sqrt(weights)
     cost_func = kwargs.pop("cost_func", LeastSquares(x_fit, y_fit, y_err, model))
     m = Minuit(cost_func, *init, name=par_name)
     if bounds: m.limits = bounds
@@ -314,7 +317,7 @@ def save_fit_minuit(dicMinuit, outputfile, HDU_target='FIT_MINUIT'):
         else:
             print(f"Coulndn't find HDU {HDU_target} in the data ; creating one.")
             fits.write(dicMinuit, extname=HDU_target)
-    print('Saving Dataframe results in {}'.format(output_file)
+    print('Saving Dataframe results in {}'.format(output_file))
     print("Saving complete.")
 
 
