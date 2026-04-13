@@ -12,6 +12,8 @@ from ulid import ULID
 from iminuit import Minuit
 from iminuit.cost import LeastSquares
 
+from utile_fitsFile import *
+
 
 ### Functions definition:
 
@@ -234,7 +236,7 @@ def fit_dipole_err(model, map, init, names, bounds=([0, 0, -90], [1, 360, 90]), 
     else: return curve_fit(model, ipix, map, p0=init, bounds=bounds, sigma= map_errY)
 
 
-def get_saveFit_minuit(m, output_path, sufix, x_fit=None, y_fit=None, y_fit_err=None, dic_param={}, index_col=None, verbose=True):
+def get_saveFit_minuit_csv(m, output_path, sufix, x_fit=None, y_fit=None, y_fit_err=None, dic_param={}, index_col=None, verbose=True):
     """Save the resulf of a fit frim iminuit into a CSV file from a pandas dataframe."""
     #For list items, drop_duplicates() returns an error.
     #Values will be saved as str, and adapted to be later reconstructed by eval().
@@ -277,6 +279,55 @@ def get_saveFit_minuit(m, output_path, sufix, x_fit=None, y_fit=None, y_fit_err=
     has_name = table_param2.index.name is not None #to save the index column only if it has a name.
     table_param2.to_csv(output_file, index=has_name)
     return table_param
+
+
+def get_dicParam_minuit(m, mapID, add_param={}, to_pandas=True):
+    """Return the dictionnary of fit results useful to be saved in an external file."""
+    dic_param = {"Map_ID": mapID}
+    for k, v in m.values.to_dict().items():
+        dic_param[k] = v
+        dic_param[k + "_init"] = m.init_params[k].value
+        dic_param[k + "_err"] = m.errors[k]
+        dic_param[k + "_fixed"] = m.fixed[k]
+        dic_param[k + "_limit_0"] = m.limits[k][0] #separated to make easier convertion Table to pd.DataFrame.
+        dic_param[k + "_limit_1"] = m.limits[k][1]
+    dic_param["valid"] = m.valid
+    for k, v in add_param.items(): dic_param[k] = v
+    if to_pandas: dic_param = pd.DataFrame([dic_param])
+    return dic_param
+
+
+def prep_df_to_fits(df):
+    """Prepare a dataframe to be saved in a fits file by adaoting some columns."""
+    data = df.copy()
+    data['Coord'] = data['Coord'].astype('U9')
+    for col in data.columns:
+        if col.endswith('_fixed'):
+            data[col].fillna(False, inplace=True)
+    return data
+
+
+def save_fit_minuit(dicMinuit, outputfile, HDU_target='FIT_MINUIT'):
+    with fitsio.FITS(outputfile, 'rw') as fits: #Ouvrir le fichier en mode écriture ('rw' crée ou écrase)
+        if HDU_target in fits: 
+            fits[HDU_target].append(dicMinuit)
+        else:
+            print(f"Coulndn't find HDU {HDU_target} in the data ; creating one.")
+            fits.write(dicMinuit, extname=HDU_target)
+    print('Saving Dataframe results in {}'.format(output_file)
+    print("Saving complete.")
+
+
+def get_save_fit_dfMinuit(dfMinuit, outputfile, HDU_target='FIT_MINUIT'):
+    df = dfMinuit.copy()
+    df = prep_df_to_fits(df)
+    data = fitsio.FITS(outputfile) #to avoid duplicates.
+    if HDU_target in data: df = get_row_not_in(df, Table(data[HDU_target].read()))
+    data.close()
+    dic = df.as_array()
+    if len(dic) == 0: print(f'All the rows already exists in {HDU_target}, or empty table given. No row was saved.')
+    else: save_fit_minuit(dic, outputfile, HDU_target)
+    return df
 
     
 ## Fit models:
