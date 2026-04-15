@@ -31,5 +31,5 @@ class DepthMapper():
             print("use ra and dec to find m5 value in the map")
             nside = hp.npix2nside(len(self.band_map))
             healpix_id = hp.ang2pix(nside, kwargs['ra'], kwargs['dec'], nest=self.nest, lonlat=True)
-        return self.band_map.iloc[healpix_id]
+        return self.band_map[healpix_id]
         
