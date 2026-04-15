@@ -111,7 +111,7 @@ def get_savefig(fig, output_path, sufix, **kwargs):
         fig.savefig(output_file, bbox_inches='tight') #bbox_inches to not cut labels and title.
 
 
-def get_hist(x, title='', xlabel='Nb. of sources by pixel', ylabel='', show=True, **kwargs):
+def get_hist(x, title='', xlabel='Nb. of sources by pixel', ylabel='', show=False, **kwargs):
     '''Plot the histogram of x, and return the corresponding var, bins obtained from this histogram by:
     var, bins = plt.hist(x, **kwargs)[:-1]
     bins = (bins[1:] + bins[:-1])/2
