@@ -339,11 +339,19 @@ def gauss(x,A,mu,sigma):
     return (A / (sigma*np.sqrt(2*np.pi)))* np.exp(-np.square(x-mu)/(2*sigma**2))
 
 
-def apply_dipole_Alb(map, A, l, b, nest):
-    """Return the measured map, when it is modified by a a dipole with amplitude A and direction l, b, depending on the true map."""
+def get_pixSide(map, cut_masked=False):
+    """From a map, return npix, nside, ipix."""
     npix = len(map) #nb. of pixels
     nside= hp.npix2nside(npix)
     ipix = np.arange(npix)
+    if hasattr(map, "mask") and cut_masked: ipix = ipix[~map.mask] #to filter masked pixels
+    return npix, nside, ipix
+
+
+def apply_dipole_Alb(map, A, l, b, nest, cut_masked=False):
+    """Return the measured map, when it is modified by a a dipole with amplitude A and direction l, b, depending on the true map."""
+    npix, nside, ipix = get_pixSide(map, cut_masked)
+    if hasattr(map, "mask"): ipix = ipix[~map.mask] #to filter masked pixels
     dipole = SkyCoord(l=l*u.degree, b=b*u.degree, frame='galactic')
     u_dipole = dipole.cartesian.xyz.value
     ra, dec = hp.pix2ang(nside, ipix, nest=nest, lonlat=True)
@@ -352,11 +360,10 @@ def apply_dipole_Alb(map, A, l, b, nest):
     return A * np.dot(u_dipole, u_source)
 
 
-def apply_dipole_ARaDec(map, A, ra, dec, nest):
+def apply_dipole_ARaDec(map, A, ra, dec, nest, cut_masked=False):
     """Return the measured map, when it is modified by a a dipole with amplitude A and direction l, b, depending on the true map."""
-    npix = len(map) #nb. of pixels
-    nside= hp.npix2nside(npix)
-    ipix = np.arange(npix)
+    npix, nside, ipix = get_pixSide(map, cut_masked)
+    if hasattr(map, "mask"): ipix = ipix[~map.mask] #to filter masked pixels
     dipole = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, frame="icrs")
     u_dipole = dipole.cartesian.xyz.value
     raS, decS = hp.pix2ang(nside, ipix, nest=nest, lonlat=True)
@@ -365,14 +372,12 @@ def apply_dipole_ARaDec(map, A, ra, dec, nest):
     return A * np.dot(u_dipole, u_source)
 
 
-def apply_dipole_MD(map, M, D0, D1, D2, nest, frame='icrs', contrast=True):
+def apply_dipole_MD(map, M, D0, D1, D2, nest, frame='icrs', contrast=True, cut_masked=False):
     """Returned the measured map, when it is modified by a a monopole M and a kinematic dipole D, depending on the true map."""
-    if frame == 'icrs': Acostheta = apply_dipole_ARaDec(map, D0, D1, D2, nest)
-    elif frame == 'galactic': Acostheta = apply_dipole_Alb(map, D0, D1, D2, nest)
+    if frame == 'icrs': Acostheta = apply_dipole_ARaDec(map, D0, D1, D2, nest, cut_masked)
+    elif frame == 'galactic': Acostheta = apply_dipole_Alb(map, D0, D1, D2, nest, cut_masked)
     elif frame == 'cartesian':
-        npix = len(map) #nb. of pixels
-        nside = hp.npix2nside(npix)
-        ipix = np.arange(npix)
+        npix, nside, ipix = get_pixSide(map, cut_masked)
         u_source = hp.pix2vec(nside, ipix, nest)
         D = np.array([D0, D1, D2])
         Acostheta = np.dot(D, u_source)
