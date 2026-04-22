@@ -228,7 +228,8 @@ def fit_minuit(x_fit, y_fit, y_err, model, init, par_name, bounds=None, fixed=[]
 
 def fit_dipole_err(model, map, init, names, bounds=([0, 0, -90], [1, 360, 90]), fixed=[], fit_mode="minuit", **kwargs):
     """Reteurn the result of a dipole fit, depending on a model. Can use either iminuit or scipy."""
-    map_errY = np.sqrt(np.abs(map)) 
+    map_errY = np.sqrt(np.abs(map))
+    if hasattr(map, "mask"): map_errY[map.mask] = np.inf #to filter masked pixels
     
     npix = len(map) #nb. of pixels
     ipix = np.arange(npix) #indices of each pixel
