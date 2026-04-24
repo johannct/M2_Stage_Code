@@ -23,7 +23,7 @@ class DepthMapper():
         map_masked = hp.ma(self.band_map, badval=-999)
         hp.projview(map_masked, nest=self.nest, norm=norm, unit='m5_' + self.band, cmap=cmap)
     
-    def m5(self, **kwargs):
+    def get_m5(self, **kwargs):
         if 'healpix_id' in kwargs:
             print("use healpix id to obtain the m5 value on the map")
             healpix_id = kwargs['healpix_id']

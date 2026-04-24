@@ -19,9 +19,9 @@ class Mapper():
         "graticule_labels": True,
         "xlabel": "RA", "ylabel": "DEC"}
     
-    def __init__(self, data, nest: bool = True, map=None):
+    def __init__(self, data, nest: bool = True, map=None, dataName="table"):
         self.nest = nest
-        self.table = data
+        self.__dict__[dataName] = data
         if map is not None: self.__dict__[self._mapNameBase] = map
         self._instance_settingsPlot = {} #to create new default settings to use in self.plot(), specific to the instance.
 
@@ -50,8 +50,14 @@ class Mapper():
     
     @classmethod
     def read(cls, filename: str, nest: bool = True, **kwargs):
-        """Load a map from an external file."""
+        """Load a map from an external file with Table.read."""
         data = Table.read(filename)
+        return cls(data=data, nest=nest, **kwargs)
+
+    @classmethod
+    def read_hdf(cls, filename: str, nest: bool = True, **kwargs):
+        """Load a map from an external file with pandas.read_hdf."""
+        data = pd.read_hdf(filename)
         return cls(data=data, nest=nest, **kwargs)
 
     
