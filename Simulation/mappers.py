@@ -178,3 +178,58 @@ class FracCovMapper(Mapper):
         map.mask[~is_in] = True
         self._create_newMap(map, toMap)
         self.frac_min, self.frac_max = frac_min, frac_max
+
+
+
+##### depth map: #####
+class DepthMapper(Mapper):
+    _mapNameBase = "m5" #base name for all map attributs (ex: self.map, self.mapMasked, self.mapCut...)
+    _settingsPlot = Mapper._settingsPlot | {'norm': 'hist', } #default settings to use in self.plot()
+    
+    def __init__(self, data, nest: bool = True):
+        super().__init__(data=data, nest=nest, map=None, dataName="df")
+    
+    def select_year(self, year : int = 1):
+        self.year = year
+        idx = self.df['year'] == year
+        sel = self.df[idx]
+        dfMap = sel.set_index('healpixID')
+        IDpix = pd.Index(np.arange(49152))
+        self._create_newMap(dfMap.reindex(IDpix), 'year')
+
+    def set_mask(self, band=None, mask=None, badval=-999, **kwargs):
+        """Set a mask to self.map and stack it in the attribut self.mapMasked.
+        - mask: if given, self.mapMasked.mask = mask. Else, a default mask is set using badval.
+        - badval: if mask is not given, value used to define the mask by healpy.ma(self.map, badval=badval).
+        - kwargs: if mask is not given, other parametters of healpy.ma() can be given here."""
+        if band is None: band = self.band
+        map = self._select_useMap(band)
+        masked = hp.ma(map, badval=badval, **kwargs)
+        if mask is not None: masked.mask = mask
+        self._create_newMap(masked, band+'Masked')
+        
+    def select_band(self, band : str):
+        self.band = band
+        band_map = self.m5year['m5_'+band].copy()
+        band_map.fillna(-999, inplace=True)
+        band_map = np.array(band_map)
+        self._create_newMap(band_map, band)
+    
+    def plot(self, band=None, use_map: str = 'Masked', **kwargs):
+        if band is None: band = self.band
+        band_map = self._select_useMap(band)
+        settings = self._settingsPlot | self._instance_settingsPlot | {'unit': f'{self._mapNameBase}_{band}'} | kwargs
+        use_map = band + use_map
+        super().plot(use_map=use_map, **settings)
+    
+    def get_m5(self, band=None, **kwargs):
+        if band is None: band = self.band
+        band_map = self._select_useMap(band)
+        if 'healpix_id' in kwargs:
+            print("use healpix id to obtain the m5 value on the map")
+            healpix_id = kwargs['healpix_id']
+        elif 'ra' in kwargs and 'dec' in kwargs:
+            print("use ra and dec to find m5 value in the map")
+            nside = hp.npix2nside(len(band_map))
+            healpix_id = hp.ang2pix(nside, kwargs['ra'], kwargs['dec'], nest=self.nest, lonlat=True)
+        return band_map[healpix_id]
