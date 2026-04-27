@@ -233,7 +233,6 @@ def fit_dipole_err(model, map, init, names, bounds=([0, 0, -90], [1, 360, 90]), 
     
     npix = len(map) #nb. of pixels
     ipix = np.arange(npix) #indices of each pixel
-    #print("ipix =", ipix)
     nside= hp.npix2nside(npix)
 
     if fit_mode == "minuit": return fit_minuit(ipix, map, map_errY, model, init, names, list(zip(bounds[0], bounds[1])), fixed, title="Fit dipole", xlabel="Pixels", **kwargs)
