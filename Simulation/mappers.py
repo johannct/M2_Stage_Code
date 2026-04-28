@@ -63,7 +63,9 @@ class Mapper():
     
     def plot(self, use_map: str = '', **kwargs):
         """Plot the HealPIX map by using healpy.projview().
+        Parameters:
         - use_map: suffix of the attribut map that has to be plotted. Default: use_map = "".
+        - kwargs: optionnal parametters to give to hp.projview(). Can also accept xlabel and ylabel to custom axes labels.
         Example :
         - use_map = "": plot self.map.
         - use_map = "Masked": plot self.mapMasked.
@@ -101,6 +103,7 @@ class DensityMapper(Mapper):
     
     def set_mask(self, mask=None, badval=0, **kwargs):
         """Set a mask to self.map and stack it in the attribut self.mapMasked.
+        Parameters:
         - mask: if given, self.mapMasked.mask = mask. Else, a default mask is set using badval.
         - badval: if mask is not given, value used to define the mask by healpy.ma(self.map, badval=badval).
         - kwargs: if mask is not given, other parametters of healpy.ma() can be given here."""
@@ -110,6 +113,7 @@ class DensityMapper(Mapper):
     
     def set_cutMask(self, cut_mask, invert=False, fromMap="Masked", toMap="Cut"):
         """Add a cut mask to a map without replacing the former mask.
+        Parameters:
         - cut_mask: mask to add; only its True values will act, without changing the other values of a former mask.
         - invert: if True, add ~cut_mask instead of cut_mask. Default: invert = False.
         - fromMap: suffix of the map from which the cut_mask will be added. Default: fromMap = "Masked", which means the cut_mask will be added from self.mapMasked.mask.
@@ -122,6 +126,8 @@ class DensityMapper(Mapper):
     
     def select_bounds(self, map_min=None, map_max=None, fromMap="", toMap="Cut"):
         """Mask all pixels the density of which is not in [map_min, map_max].
+        Parameters:
+        - map_min, map_max: minimum and maximum values to keep. If None, all values are kept. Deault: map_min=None, map_max=None.
         - fromMap: suffix of the map from which the min and max are computed. Default: fromMap = "", which means they will be computed from self.map.
           However, since self.map has no attribut mask, the cut_mask will be added from self.mapMasked.mask.
         - toMap: suffix of the map to which the cut masked map will be stocked. Default: toMap = "Cut", which means the cut masked map will be stocked into self.mapCut."""
@@ -171,6 +177,8 @@ class FracCovMapper(Mapper):
     
     def cut_FracCov(self, frac_min=0, frac_max=1, fromMap="nside", toMap="cut"):
         """Mask all pixels the density of which is not in [frac_min, frac_max].
+        Parameters:
+        - frac_min, frac_max: minimum and maximum values to keep. Default: frac_min=0, frac_max=1.
         - fromMap: suffix of the map from which the min and max are computed. Default: fromMap = "nside", which means they will be computed from self.FRACCOVnside.
         - toMap: suffix of the map to which the cut masked map will be stocked. Default: toMap = "cut", which means the cut masked map will be stocked into self.FRACCOVcut."""
         map = self._select_useMap(fromMap)
@@ -183,13 +191,21 @@ class FracCovMapper(Mapper):
 
 ##### depth map: #####
 class DepthMapper(Mapper):
+    """A class to read and manipulate m5 maps."""
     _mapNameBase = "m5" #base name for all map attributs (ex: self.map, self.mapMasked, self.mapCut...)
     _settingsPlot = Mapper._settingsPlot | {'norm': 'hist', } #default settings to use in self.plot()
     
     def __init__(self, data, nest: bool = True):
         super().__init__(data=data, nest=nest, map=None, dataName="df")
+
+    def _get_band_map(self, band : str = None):
+        if band is None: band = self.band
+        band_map = self._select_useMap(band)
+        return band, band_map
     
     def select_year(self, year : int = 1):
+        """Select a year in the data, and and create the corresponding DataFrame with the indices of healPIX pixels, in order to obtain the full healpIX map.
+        This DataFrame is stocked in the attribut m5year of the instance."""
         self.year = year
         idx = self.df['year'] == year
         sel = self.df[idx]
@@ -199,16 +215,19 @@ class DepthMapper(Mapper):
 
     def set_mask(self, band=None, mask=None, badval=-999, **kwargs):
         """Set a mask to self.map and stack it in the attribut self.mapMasked.
+        Parameters:
         - mask: if given, self.mapMasked.mask = mask. Else, a default mask is set using badval.
         - badval: if mask is not given, value used to define the mask by healpy.ma(self.map, badval=badval).
         - kwargs: if mask is not given, other parametters of healpy.ma() can be given here."""
-        if band is None: band = self.band
-        map = self._select_useMap(band)
+        # if band is None: band = self.band
+        # map = self._select_useMap(band)
+        band, map = self._get_band_map(band)
         masked = hp.ma(map, badval=badval, **kwargs)
         if mask is not None: masked.mask = mask
         self._create_newMap(masked, band+'Masked')
         
     def select_band(self, band : str):
+        """Select the m5 map corresponding to a band and stock it into an attribut of the instance."""
         self.band = band
         band_map = self.m5year['m5_'+band].copy()
         band_map.fillna(-999, inplace=True)
@@ -216,15 +235,20 @@ class DepthMapper(Mapper):
         self._create_newMap(band_map, band)
     
     def plot(self, band=None, use_map: str = 'Masked', **kwargs):
-        if band is None: band = self.band
-        band_map = self._select_useMap(band)
+        """Plot the m5 map corresponding to a given band. If no band is given, plot the last one that has been selected by self.select_band()."""
+        # if band is None: band = self.band
+        # band_map = self._select_useMap(band)
+        band, band_map = self._get_band_map(band)
         settings = self._settingsPlot | self._instance_settingsPlot | {'unit': f'{self._mapNameBase}_{band}'} | kwargs
         use_map = band + use_map
         super().plot(use_map=use_map, **settings)
     
     def get_m5(self, band=None, **kwargs):
-        if band is None: band = self.band
-        band_map = self._select_useMap(band)
+        """return the m5 value corresponding to a given pixel or a given ra, dec, depending on a given band.
+        If no band is given, use the last one that has been selected by self.select_band()."""
+        # if band is None: band = self.band
+        # band_map = self._select_useMap(band)
+        band, band_map = self._get_band_map(band)
         if 'healpix_id' in kwargs:
             print("use healpix id to obtain the m5 value on the map")
             healpix_id = kwargs['healpix_id']
