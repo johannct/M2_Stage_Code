@@ -7,8 +7,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from astropy.table import Table, vstack, MaskedColumn
 
-try: from simulMap import RADEC2NSource_Table
-except: from Simulation.simulMap import RADEC2NSource_Table
+try: from simulMap import raDec2map_Table
+except: from Simulation.simulMap import raDec2map_Table
 
 
 ##### Parent class to all others: ##### 
@@ -87,7 +87,7 @@ class DensityMapper(Mapper):
         self.nside = nside
         self.area_deg2 = hp.nside2pixarea(self.nside, degrees=True)
         super().__init__(data=data, nest=nest, map=map)
-        if map is None: self.__dict__[self._mapNameBase] = RADEC2NSource_Table(self.nside, self.table, nest=self.nest)/self.area_deg2
+        if map is None: self.__dict__[self._mapNameBase] = raDec2map_Table(self.nside, self.table, nest=self.nest)/self.area_deg2
     
     
     def add(self, mapper):
