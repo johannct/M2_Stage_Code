@@ -41,6 +41,19 @@ def get_raDec2map(NSIDE, NSource_px_th):
     return NSource_px, RA, DEC
 
 
+def nz_model(z):
+    """Compute the normalized distribution in redshift dependong on the redshift z."""
+    return z**2 * np.exp(-(z/0.5)**1.5)
+
+
+def build_nz(zmin):
+    z = np.linspace(0.01, 3.0, 400)
+    nz = nz_model(z)
+    nz[z < zmin] = 0
+    nz /= np.trapz(nz, z)
+    return z, nz
+
+
 def cut_m52map(m, m5, chunk_size=1e4):
     m = da.from_array(np.array(m), chunks=chunk_size)
     m5 = da.from_array(np.array(m5), chunks=chunk_size)
