@@ -83,24 +83,16 @@ def acceptReject(N, sampling_func, acceptance_func, args):
 
 def generate_redshift(N, z_min, z_max, get_proba=False):
     """Generate N randomized redshifts, by using a reject test and nz_model distribution."""
-    # n(z) = z^2 * np.exp(-(z/0.5)^1.5)
-    # y = (z/0.5)^1.5 = (z/0.5)^(3/2) => z = 0.5*y^(2/3) => z^2 = 0.25*y^(4/3)
-    y_min, y_max = (z_min/0.5)**1.5, (z_max/0.5)**1.5
-    y_min, y_max = (z_min)**1.5, (z_max)**1.5
-    
-    # f(y) = n(y) = 0.25*y^(4/3) * exp(-y)
-    # g(z) = z^2 => g(y) =  0.25*y^(4/3)
-    args = (4/3, y_min, y_max)
     sampling_func = sample_truncated_power_law
-    
-    # Acceptance function:
-    # f(z)/g(z) = np.exp(-(z/0.5)^1.5) = np.exp(-y)
-    # acceptance_ratio = np.exp(-y_cand)
-    acceptance_func = lambda y: np.exp(-y)
+    args = (2, z_min, z_max)
+    # Acceptance ratio:
+    # f(z) = z^2 * np.exp(-(z/0.5)^1.5)
+    # g(z) = z^2
+    # f(z)/g(z) = np.exp(-(z/0.5)^1.5)
+    # acceptance_ratio = np.exp(-(z_cand/0.5)^1.5)
+    acceptance_func = lambda z: np.exp(-(z/0.5)**1.5)
     
     samples, proba = acceptReject(N, sampling_func, acceptance_func, args)
-    #samples = 0.5*samples**(2/3)
-    samples = samples**(2/3)
     if get_proba: return np.array(samples), np.array(proba)
     else: return np.array(samples)
     
