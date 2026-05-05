@@ -1,6 +1,7 @@
 '''A module containing several useful functions to simulate and fit sky maps.'''
 
 ### Package importation:
+import os
 import numpy as np
 import dask.array as da
 import healpy as hp
@@ -59,6 +60,7 @@ def cut_m52map(m, m5, chunk_size=1e4):
 def get_savefig(fig, output_path, sufix, **kwargs):
     """Save the figure fig; several format for the images can be chosen in the same time, by inputing a tuple or a list in the parmateer format.
     This function is especially created to be used in other functions."""
+    os.makedirs(output_path, exist_ok=True)
     ext = kwargs.get('format', 'pdf')
     if type(ext)==tuple or type(ext)==list: #to save in several formats.
         for e in ext:
