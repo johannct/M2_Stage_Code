@@ -19,10 +19,10 @@ class Mapper():
         "graticule_labels": True,
         "xlabel": "RA", "ylabel": "DEC"}
     
-    def __init__(self, data, nest: bool = True, map=None, dataName="table"):
+    def __init__(self, data, nest: bool = True, hpmap=None, dataName="table"): #called "hpmap" rather than "map" to avoid risk to confuse with map() python function.
         self.nest = nest
         self.__dict__[dataName] = data
-        if map is not None: self.__dict__[self._mapNameBase] = map
+        if hpmap is not None: self.__dict__[self._mapNameBase] = hpmap
         self._instance_settingsPlot = {} #to create new default settings to use in self.plot(), specific to the instance.
 
     
@@ -40,12 +40,12 @@ class Mapper():
         return self.__dict__[self._mapNameBase + suffix].copy()
 
     
-    def _create_newMap(self, map, suffix):
+    def _create_newMap(self, hpmap, suffix):
         """Add an attribut map to the instance self, named self._mapNameBase + suffix."""
         if suffix=="": raise ValueError(f"You gave suffix = '', which means you are trying to rewrite the attribut {self._mapNameBase}. This attribut cannot by modify by this function.")
         mapName = self._mapNameBase + suffix
         if hasattr(self, mapName): print(f"Attribut {mapName} already existed and has been replaced.")
-        self.__dict__[mapName] = map
+        self.__dict__[mapName] = hpmap
     
     
     @classmethod
@@ -72,8 +72,8 @@ class Mapper():
         - use_map = "Cut": plot self.mapCut."""
         settings = self._settingsPlot | self._instance_settingsPlot | kwargs
         xlabel, ylabel = settings.pop("xlabel"), settings.pop("ylabel")
-        map = self._select_useMap(use_map) #choosing which attribut map to plot.
-        hp.projview(map, nest=self.nest, **settings)
+        hpmap = self._select_useMap(use_map) #choosing which attribut map to plot.
+        hp.projview(hpmap, nest=self.nest, **settings)
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
 
@@ -85,11 +85,11 @@ class DensityMapper(Mapper):
     _settingsPlot = Mapper._settingsPlot | {
         "unit": "Source density in $[\deg^{-2}]$"} #default settings to use in self.plot()
     
-    def __init__(self, data, nside: int, nest: bool = True, map=None):
+    def __init__(self, data, nside: int, nest: bool = True, hpmap=None):
         self.nside = nside
         self.area_deg2 = hp.nside2pixarea(self.nside, degrees=True)
-        super().__init__(data=data, nest=nest, map=map)
-        if map is None: self.__dict__[self._mapNameBase] = raDec2map_Table(self.nside, self.table, nest=self.nest)/self.area_deg2
+        super().__init__(data=data, nest=nest, hpmap=hpmap)
+        if hpmap is None: self.__dict__[self._mapNameBase] = raDec2map_Table(self.nside, self.table, nest=self.nest)/self.area_deg2
     
     
     def add(self, mapper):
@@ -97,8 +97,8 @@ class DensityMapper(Mapper):
         - new.map = self.map + mapper.map
         - new.table = vstack([self.table, mapper.table])"""
         data = vstack([self.table, mapper.table])
-        map = self.map + mapper.map
-        return self.__class__(data=data, nside=self.nside, nest=self.nside, map=map)
+        hpmap = self.map + mapper.map
+        return self.__class__(data=data, nside=self.nside, nest=self.nside, hpmap=hpmap)
 
     
     def set_mask(self, mask=None, badval=0, **kwargs):
@@ -131,10 +131,10 @@ class DensityMapper(Mapper):
         - fromMap: suffix of the map from which the min and max are computed. Default: fromMap = "", which means they will be computed from self.map.
           However, since self.map has no attribut mask, the cut_mask will be added from self.mapMasked.mask.
         - toMap: suffix of the map to which the cut masked map will be stocked. Default: toMap = "Cut", which means the cut masked map will be stocked into self.mapCut."""
-        map = self._select_useMap(fromMap)
-        if map_min is None: map_min = np.nanmin(map)
-        if map_max is None: map_max = np.nanmax(map)
-        is_in = (map_min <= map) & (map <= map_max) #True if counts in bounds
+        hpmap = self._select_useMap(fromMap)
+        if map_min is None: map_min = np.nanmin(hpmap)
+        if map_max is None: map_max = np.nanmax(hpmap)
+        is_in = (map_min <= hpmap) & (hpmap <= map_max) #True if counts in bounds
         if fromMap == "":
             print("Attribut map has no attribut mask. Using mask from mapMasked instead.")
             fromMap = "Masked"
@@ -150,7 +150,7 @@ class FracCovMapper(Mapper):
         "cmap": "jet"} #default settings to use in self.plot()
     
     def __init__(self, data, nest: bool = True):
-        super().__init__(data=data, nest=nest, map=None)
+        super().__init__(data=data, nest=nest, hpmap=None)
         self.__dict__[self._mapNameBase] = self.table['FRACCOV'].copy()
         self.nsideOriginal = hp.npix2nside(len(self.table))
         
@@ -181,10 +181,10 @@ class FracCovMapper(Mapper):
         - frac_min, frac_max: minimum and maximum values to keep. Default: frac_min=0, frac_max=1.
         - fromMap: suffix of the map from which the min and max are computed. Default: fromMap = "nside", which means they will be computed from self.FRACCOVnside.
         - toMap: suffix of the map to which the cut masked map will be stocked. Default: toMap = "cut", which means the cut masked map will be stocked into self.FRACCOVcut."""
-        map = self._select_useMap(fromMap)
-        is_in = (frac_min <= map) & (map <= frac_max) #True if FRACCOV in bounds
-        map.mask[~is_in] = True
-        self._create_newMap(map, toMap)
+        hpmap = self._select_useMap(fromMap)
+        is_in = (frac_min <= hpmap) & (hpmap <= frac_max) #True if FRACCOV in bounds
+        hpmap.mask[~is_in] = True
+        self._create_newMap(hpmap, toMap)
         self.frac_min, self.frac_max = frac_min, frac_max
 
 
@@ -196,12 +196,14 @@ class DepthMapper(Mapper):
     _settingsPlot = Mapper._settingsPlot | {'norm': 'hist', } #default settings to use in self.plot()
     
     def __init__(self, data, nest: bool = True):
-        super().__init__(data=data, nest=nest, map=None, dataName="df")
+        super().__init__(data=data, nest=nest, hpmap=None, dataName="df")
 
+    
     def _get_band_map(self, band : str = None):
         if band is None: band = self.band
         band_map = self._select_useMap(band)
         return band, band_map
+    
     
     def select_year(self, year : int = 1):
         """Select a year in the data, and and create the corresponding DataFrame with the indices of healPIX pixels, in order to obtain the full healpIX map.
@@ -213,19 +215,19 @@ class DepthMapper(Mapper):
         IDpix = pd.Index(np.arange(49152))
         self._create_newMap(dfMap.reindex(IDpix), 'year')
 
+    
     def set_mask(self, band=None, mask=None, badval=-999, **kwargs):
         """Set a mask to self.map and stack it in the attribut self.mapMasked.
         Parameters:
         - mask: if given, self.mapMasked.mask = mask. Else, a default mask is set using badval.
         - badval: if mask is not given, value used to define the mask by healpy.ma(self.map, badval=badval).
         - kwargs: if mask is not given, other parametters of healpy.ma() can be given here."""
-        # if band is None: band = self.band
-        # map = self._select_useMap(band)
-        band, map = self._get_band_map(band)
-        masked = hp.ma(map, badval=badval, **kwargs)
+        band, band_map = self._get_band_map(band)
+        masked = hp.ma(band_map, badval=badval, **kwargs)
         if mask is not None: masked.mask = mask
         self._create_newMap(masked, band+'Masked')
         
+    
     def select_band(self, band : str):
         """Select the m5 map corresponding to a band and stock it into an attribut of the instance."""
         self.band = band
@@ -234,20 +236,18 @@ class DepthMapper(Mapper):
         band_map = np.array(band_map)
         self._create_newMap(band_map, band)
     
+    
     def plot(self, band=None, use_map: str = 'Masked', **kwargs):
         """Plot the m5 map corresponding to a given band. If no band is given, plot the last one that has been selected by self.select_band()."""
-        # if band is None: band = self.band
-        # band_map = self._select_useMap(band)
         band, band_map = self._get_band_map(band)
         settings = self._settingsPlot | self._instance_settingsPlot | {'unit': f'{self._mapNameBase}_{band}'} | kwargs
         use_map = band + use_map
         super().plot(use_map=use_map, **settings)
     
+    
     def get_m5(self, band=None, **kwargs):
         """return the m5 value corresponding to a given pixel or a given ra, dec, depending on a given band.
         If no band is given, use the last one that has been selected by self.select_band()."""
-        # if band is None: band = self.band
-        # band_map = self._select_useMap(band)
         band, band_map = self._get_band_map(band)
         if 'healpix_id' in kwargs:
             print("use healpix id to obtain the m5 value on the map")

@@ -2,19 +2,8 @@ import numpy as np
 import healpy as hp
 import pyccl as ccl
 
-
-
-def nz_model(z):
-    """Compute the normalized distribution in redshift dependong on the redshift z."""
-    return z**2 * np.exp(-(z/0.5)**1.5)
-
-
-def build_nz(zmin):
-    z = np.linspace(0.01, 3.0, 400)
-    nz = nz_model(z)
-    nz[z < zmin] = 0
-    nz /= np.trapz(nz, z)
-    return z, nz
+try: from simulMap import nz_model, build_nz
+except: from Simulation.simulMap import nz_model, build_nz
 
 
 def get_Cl_ccl(nside, zmin, Omega_c=0.25, Omega_b=0.05, h=0.67, sigma8=0.8, n_s=0.96, get_ell=False, cosmo=None):

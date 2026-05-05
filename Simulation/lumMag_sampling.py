@@ -5,6 +5,9 @@ import astropy.units as u
 from astropy.table import Table
 from scipy.integrate import quad
 
+try: from simulMap import nz_model
+except: from Simulation.simulMap import nz_model
+
 
 ### Functions definition:
 
@@ -25,13 +28,13 @@ def lum2flux(L, dL):
 def sample_truncated_power_law(alpha, xmin, xmax, size=None):
     """
     Sample from a truncated power-law distribution p(x) ∝ x^alpha
-    for xmin <= x <= xmax, with alpha < -1.
+    for xmin <= x <= xmax, with alpha != -1.
 
     Parameters:
-        alpha (float): exponent (must be < -1)
-        xmin (float): lower bound (> 0)
-        xmax (float): upper bound (> xmin)
-        size (int): number of samples
+       - alpha (float): exponent (must be < -1)
+       - xmin (float): lower bound (> 0)
+       - xmax (float): upper bound (> xmin)
+       - size (int): number of samples
 
     Returns:
         numpy array of samples
@@ -56,27 +59,56 @@ def proba_schechter_lumRatio(x, alpha, phi_star=1):
         return phi_star * np.power(x, alpha) * np.exp(-x)
 
 
-def generate_schechter_lumRatio(N, alpha, x_min, x_max, phi_star=1, get_proba=False):
-    """Generate N randomized luminosities, by using a reject test and Schechter's law."""
-    samples = []
+def acceptReject(N, sampling_func, acceptance_func, args):
+    """Create a sample of size N by using an accept-reject test from a sampling function and an acceptance function.
+    args is a tuple containing the arguments to give to sampling_func.
+    acceptance_func is the function computing the acceptance ratio by acceptance_ratio = acceptance_func(x_cand)."""
+    samples, proba = [], []
     reject = 0
     
     while len(samples) < N:
-        L_cand = sample_truncated_power_law(alpha, x_min, x_max)
-        
-        # Acceptance ratio:
-        # f(x) = x^alpha * exp(-x)
-        # g(x) = x^alpha (on ignore la constante de normalisation qui s'annule)
-        # f(x)/g(x) = exp(-x)
-        acceptance_ratio = np.exp(-L_cand)
+        x_cand = sampling_func(*args)
+        acceptance_ratio = acceptance_func(x_cand)
         
         # Acceptance test:
         u = np.random.uniform(0, 1)
         if u < acceptance_ratio:
-            samples.append(L_cand)
+            samples.append(x_cand)
+            proba.append(u)
         else:
             reject += 1
     print('Number of rejects =', reject)
+    return np.array(samples), np.array(proba)
+
+
+def generate_redshift(N, z_min, z_max, get_proba=False):
+    """Generate N randomized redshifts, by using a reject test and nz_model distribution."""
+    sampling_func = sample_truncated_power_law
+    args = (2, z_min, z_max)
+    # Acceptance ratio:
+    # f(z) = z^2 * np.exp(-(z/0.5)^1.5)
+    # g(z) = z^2
+    # f(z)/g(z) = np.exp(-(z/0.5)^1.5)
+    # acceptance_ratio = np.exp(-(z_cand/0.5)^1.5)
+    acceptance_func = lambda z: np.exp(-(z/0.5)**1.5)
+    
+    samples, proba = acceptReject(N, sampling_func, acceptance_func, args)
+    if get_proba: return np.array(samples), np.array(proba)
+    else: return np.array(samples)
+    
+
+def generate_schechter_lumRatio(N, alpha, x_min, x_max, phi_star=1, get_proba=False):
+    """Generate N randomized luminosities, by using a reject test and Schechter's law."""
+    sampling_func = sample_truncated_power_law
+    args = (alpha, x_min, x_max)
+    # Acceptance ratio:
+    # f(x) = x^alpha * exp(-x)
+    # g(x) = x^alpha (on ignore la constante de normalisation qui s'annule)
+    # f(x)/g(x) = exp(-x)
+    # acceptance_ratio = np.exp(-L_cand)
+    acceptance_func = lambda x: np.exp(-x)
+    
+    samples, proba = acceptReject(N, sampling_func, acceptance_func, args)
     if get_proba: return np.array(samples), np.array(proba)
     else: return np.array(samples)
 
@@ -101,9 +133,11 @@ def generate_lumMag(N, L_min=1e7, L_max=1e11,  L_star=1e10, alpha=-1.1, z_min=0.
     c = kwargs.get('c', 3e5) #speed of ligt in km/s (because H0 is in Km/s/Mpc)
     M_sun = kwargs.get('M_sun', 4.83) #Absolute magnitude of Sun
     L_sun = kwargs.get('L_sun', 1) #Luminosity of Sun
-    
-    z = np.random.uniform(z_min, z_max, N) #Redshift
+
+    print("\nGenerating redshifts")
+    z = generate_redshift(N, z_min, z_max) #Redshift
     dL_mpc = np.array([get_dL(zi, H0, Om, Ol, c) for zi in z]) #luminosity distance in Mpc
+    print("\nGenerating luminosities") 
     L = generate_schechter_lum(N, L_star, alpha, L_min, L_max, phi_star) #luminosities
     M = lum2absMag(L, M_sun, L_sun) #Absolute magnitudes
     m = M + 5*np.log10(dL_mpc) + 25 #Aparent magnitudes
