@@ -29,22 +29,28 @@ def raDec2map_Table(NSIDE, table, col_RA="RA", col_DEC="DEC", **kwargs):
     return raDec2map(NSIDE, table[col_RA], table[col_DEC], **kwargs)
     
 
+def generate_raDec(N):
+    '''Return the simulated number of sources by pixel, the right-ascention and the declination, by uniformally randomizing RA and DEC, depending on the resolution NSIDE and the theorical number of sources by pixel NSource_px_th.'''
+    RA = np.random.uniform(0, 360, int(N))
+    DEC_sin = np.random.uniform(-1, 1, int(N)) #pour DEC, il faut passer par sin(DEC), compris entre -1 et 1
+    DEC = np.degrees(np.arcsin(DEC_sin))
+    return RA, DEC
+
+
 def get_raDec2map(NSIDE, NSource_px_th):
     '''Return the simulated number of sources by pixel, the right-ascention and the declination, by uniformally randomizing RA and DEC, depending on the resolution NSIDE and the theorical number of sources by pixel NSource_px_th.'''
     #RA, DEC simulation:
     NPIX = hp.nside2npix(NSIDE)
-    RA = np.random.uniform(0, 360, int(NPIX*NSource_px_th))
-    DEC_sin = np.random.uniform(-1, 1, int(NPIX*NSource_px_th)) #pour DEC, il faut passer par sin(DEC), compris entre -1 et 1
-    DEC = np.degrees(np.arcsin(DEC_sin))
+    RA, DEC = generate_raDec(int(NPIX*NSource_px_th))
 
     #Number of sources by pixel conversion:
     NSource_px = raDec2map(NSIDE, RA, DEC)
     return NSource_px, RA, DEC
 
 
-def nz_model(z):
+def nz_model(z, sigma=0.5, beta=1.5):
     """Compute the normalized distribution in redshift dependong on the redshift z."""
-    return z**2 * np.exp(-(z/0.5)**1.5)
+    return z**2 * np.exp(-(z/sigma)**beta)
 
 
 def build_nz(zmin):

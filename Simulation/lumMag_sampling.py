@@ -4,6 +4,7 @@ import numpy as np
 import astropy.units as u
 from astropy.table import Table
 from scipy.integrate import quad
+from scipy.stats import gamma
 
 try: from simulMap import nz_model
 except: from Simulation.simulMap import nz_model
@@ -59,45 +60,68 @@ def proba_schechter_lumRatio(x, alpha, phi_star=1):
         return phi_star * np.power(x, alpha) * np.exp(-x)
 
 
-def acceptReject(N, sampling_func, acceptance_func, args):
+def acceptReject(N, sampling_func, acceptance_func, args, pmax_func=None):
     """Create a sample of size N by using an accept-reject test from a sampling function and an acceptance function.
     args is a tuple containing the arguments to give to sampling_func.
     acceptance_func is the function computing the acceptance ratio by acceptance_ratio = acceptance_func(x_cand)."""
-    samples, proba = [], []
+    samples = []
     reject = 0
+    remaining = N
+    total = 0
     
-    while len(samples) < N:
-        x_cand = sampling_func(*args)
+    while remaining > 0:
+        sampling_func_size = lambda *args: sampling_func(*args, size=remaining * 3)
+        x_cand = sampling_func_size(*args)
         acceptance_ratio = acceptance_func(x_cand)
         
         # Acceptance test:
-        u = np.random.uniform(0, 1)
-        if u < acceptance_ratio:
-            samples.append(x_cand)
-            proba.append(u)
-        else:
-            reject += 1
+        if pmax_func is None: pmax = 1
+        else: pmax = pmax_func(x_cand)
+        u = np.random.uniform(0, pmax, size=x_cand.shape)
+        accepted = x_cand[u < acceptance_ratio]
+        reject += remaining * 3 - len(accepted)
+        total += remaining * 3
+        samples.append(accepted)
+        remaining -= len(accepted)
+        
     print('Number of rejects =', reject)
-    return np.array(samples), np.array(proba)
+    print(f"Accepted ratio = {int((total-reject)/total*100)}%")
+    return np.concatenate(samples)[:N]
 
 
-def generate_redshift(N, z_min, z_max, get_proba=False):
+def generate_redshift(N, z_min=None, z_max=None, sigma=0.5,  beta=1.5):
     """Generate N randomized redshifts, by using a reject test and nz_model distribution."""
-    sampling_func = sample_truncated_power_law
-    args = (2, z_min, z_max)
-    # Acceptance ratio:
-    # f(z) = z^2 * np.exp(-(z/0.5)^1.5)
-    # g(z) = z^2
-    # f(z)/g(z) = np.exp(-(z/0.5)^1.5)
-    # acceptance_ratio = np.exp(-(z_cand/0.5)^1.5)
-    acceptance_func = lambda z: np.exp(-(z/0.5)**1.5)
+    # Analytically finding the maximum: d/dz[dist] = 0
+    # => 2z - beta/sigma * (z/sigma)^(beta-1) * z^2 = 0
+    # => z_mode = sigma * (2/beta)^(1/(beta-1))
+    z_mode = sigma * (2 / beta) ** (1 / beta)
+    peak = nz_model(z_mode, sigma, beta)
+
+    # Global envelope: use a Gamma(3, scale) distribution which has the same
+    # z^2 * exp(-z/scale) shape, matching both the power-law rise and exponential decay.
+    # Choose scale to match the mode: mode of Gamma(a, scale) = (a-1)*scale
+    # For a=3: mode = 2*scale => scale = z_mode / 2
+    a = 3
+    scale = z_mode / (a - 1)
+
+    g_dist = gamma(a, scale=scale)
+    g_peak_ratio = peak / g_dist.pdf(z_mode)  # constant M such that dist <= M * g(z)
     
-    samples, proba = acceptReject(N, sampling_func, acceptance_func, args)
-    if get_proba: return np.array(samples), np.array(proba)
-    else: return np.array(samples)
+    args = (z_min, z_max)
+    def sampling_func(z_min, z_max, size):
+        z_cand = g_dist.rvs(size=size)
+        if z_min is not None: z_cand = z_cand[z_cand >= z_min]
+        if z_max is not None: z_cand = z_cand[z_cand <= z_max]
+        return z_cand
+    
+    acceptance_func = lambda z: nz_model(z, sigma, beta)
+    pmax_func = lambda z: g_peak_ratio * g_dist.pdf(z)
+    
+    samples = acceptReject(N, sampling_func, acceptance_func, args, pmax_func=pmax_func)
+    return np.array(samples)
     
 
-def generate_schechter_lumRatio(N, alpha, x_min, x_max, phi_star=1, get_proba=False):
+def generate_schechter_lumRatio(N, alpha, x_min, x_max, phi_star=1):
     """Generate N randomized luminosities, by using a reject test and Schechter's law."""
     sampling_func = sample_truncated_power_law
     args = (alpha, x_min, x_max)
@@ -108,9 +132,8 @@ def generate_schechter_lumRatio(N, alpha, x_min, x_max, phi_star=1, get_proba=Fa
     # acceptance_ratio = np.exp(-L_cand)
     acceptance_func = lambda x: np.exp(-x)
     
-    samples, proba = acceptReject(N, sampling_func, acceptance_func, args)
-    if get_proba: return np.array(samples), np.array(proba)
-    else: return np.array(samples)
+    samples = acceptReject(N, sampling_func, acceptance_func, args)
+    return np.array(samples)
 
 
 def generate_schechter_lum(N, L_star, alpha, L_min, L_max, phi_star):
