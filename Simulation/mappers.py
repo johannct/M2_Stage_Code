@@ -118,11 +118,11 @@ class Mapper():
 
 
 
-##### Density map: #####
-class DensityMapper(Mapper):
-    """A class to read and manipulate density maps."""
+##### Count map: #####
+class CountMapper(Mapper):
+    """A class to read and manipulate count maps."""
     _settingsPlot = Mapper._settingsPlot | {
-        "unit": "Source density in $[\deg^{-2}]$"} #default settings to use in self.plot()
+        "unit": "Count"} #default settings to use in self.plot()
     
     def __init__(self, data, nside: int, nest: bool = True, hpmap=None, get_grouped=False):
         super().__init__(data=data, nest=nest, hpmap=hpmap)
@@ -161,7 +161,7 @@ class DensityMapper(Mapper):
         if get_grouped: self.get_df_grouped(col_ipix=col_ipix, df_col=df_col)
 
         #adding map:
-        if replace_map: self.__dict__[self._mapNameBase] = raDec2map_Table(self.nside, self.table, nest=self.nest)/self.area_deg2
+        if replace_map: self.__dict__[self._mapNameBase] = raDec2map_Table(self.nside, self.table, nest=self.nest)
 
     
     def set_mask(self, mask=None, badval=0, **kwargs):
@@ -202,6 +202,96 @@ class DensityMapper(Mapper):
             print("Attribut map has no attribut mask. Using mask from mapMasked instead.")
             fromMap = "Masked"
         self.set_cutMask(is_in, invert=True, fromMap=fromMap, toMap=toMap)
+        
+
+
+
+##### Density map: #####
+class DensityMapper(CountMapper):
+    """A class to read and manipulate density maps."""
+    _settingsPlot = Mapper._settingsPlot | {
+        "unit": "Source density in $[\deg^{-2}]$"} #default settings to use in self.plot()
+    
+    def __init__(self, data, nside: int, nest: bool = True, hpmap=None, get_grouped=False):
+        super().__init__(data=data, nside=nside, nest=nest, hpmap=hpmap, get_grouped=get_grouped)
+    #     if hpmap is None: replace_map = True
+    #     else: replace_map = False
+    #     self.get_nside(nside=nside, replace_map=replace_map, get_grouped=get_grouped)
+    
+    
+    # def add(self, mapper, get_grouped: bool = False):
+    #     """Add another DensityMapper to the instance, and return a new DensityMapper with:
+    #     - new.map = self.map + mapper.map
+    #     - new.table = vstack([self.table, mapper.table])"""
+    #     if (self.table is None) or (mapper.table is None): data=None
+    #     else: data = vstack([self.table, mapper.table])
+    #     hpmap = self.map + mapper.map
+    #     return self.__class__(data=data, nside=self.nside, nest=self.nside, hpmap=hpmap, get_grouped=get_grouped)
+
+    
+    # def get_df_grouped(self, col_ipix='HealPIX', df_col=None):
+    #     try:
+    #         if df_col is None: df_col = [col for col in self.table.colnames if self.table[col].ndim == 1]
+    #         self.df = self.table[df_col].to_pandas()  #can only convert ndim=1 columns
+    #         self.df_grouped = self.df.groupby(col_ipix)
+    #     except: print("Could not create DataFrame from Table")
+    
+    
+    def get_nside(self, nside: int, replace_map: bool = True, get_grouped: bool = False, df_col=None):
+        # #adding nside information:
+        # self.nside = nside
+        # self.area_deg2 = hp.nside2pixarea(self.nside, degrees=True)
+        # if self.table is not None:
+        #     col_ipix = 'HealPIX'
+        #     if not col_ipix in self.table.columns: self.table[col_ipix] = hp.ang2pix(nside, self.table['RA'], self.table['DEC'], nest=self.nest, lonlat=True)
+
+        # #adding DataFrames:
+        # if get_grouped: self.get_df_grouped(col_ipix=col_ipix, df_col=df_col)
+
+        # #adding map:
+        # if replace_map: self.__dict__[self._mapNameBase] = raDec2map_Table(self.nside, self.table, nest=self.nest)/self.area_deg2
+        super().get_nside(nside=nside, replace_map=replace_map, get_grouped=get_grouped, df_col=df_col)
+        if replace_map: self.__dict__[self._mapNameBase] = self.__dict__[self._mapNameBase]/ self.area_deg2
+
+    
+    # def set_mask(self, mask=None, badval=0, **kwargs):
+    #     """Set a mask to self.map and stack it in the attribut self.mapMasked.
+    #     Parameters:
+    #     - mask: if given, self.mapMasked.mask = mask. Else, a default mask is set using badval.
+    #     - badval: if mask is not given, value used to define the mask by healpy.ma(self.map, badval=badval).
+    #     - kwargs: if mask is not given, other parametters of healpy.ma() can be given here."""
+    #     self.mapMasked = hp.ma(self.map, badval=badval, **kwargs)
+    #     if mask is not None: self.mapMasked.mask = mask
+
+    
+    # def set_cutMask(self, cut_mask, invert=False, fromMap="Masked", toMap="Cut"):
+    #     """Add a cut mask to a map without replacing the former mask.
+    #     Parameters:
+    #     - cut_mask: mask to add; only its True values will act, without changing the other values of a former mask.
+    #     - invert: if True, add ~cut_mask instead of cut_mask. Default: invert = False.
+    #     - fromMap: suffix of the map from which the cut_mask will be added. Default: fromMap = "Masked", which means the cut_mask will be added from self.mapMasked.mask.
+    #     - toMap: suffix of the map to which the cut masked map will be stocked. Default: toMap = "Cut", which means the cut masked map will be stocked into self.mapCut."""
+    #     sel = self._select_useMap(fromMap) #choosing which attribut map to strart from.
+    #     if invert: cut_mask = ~cut_mask
+    #     sel.mask[cut_mask] = True
+    #     self._create_newMap(sel, toMap)
+
+    
+    # def select_bounds(self, map_min=None, map_max=None, fromMap="", toMap="Cut"):
+    #     """Mask all pixels the density of which is not in [map_min, map_max].
+    #     Parameters:
+    #     - map_min, map_max: minimum and maximum values to keep. If None, all values are kept. Deault: map_min=None, map_max=None.
+    #     - fromMap: suffix of the map from which the min and max are computed. Default: fromMap = "", which means they will be computed from self.map.
+    #       However, since self.map has no attribut mask, the cut_mask will be added from self.mapMasked.mask.
+    #     - toMap: suffix of the map to which the cut masked map will be stocked. Default: toMap = "Cut", which means the cut masked map will be stocked into self.mapCut."""
+    #     hpmap = self._select_useMap(fromMap)
+    #     if map_min is None: map_min = np.nanmin(hpmap)
+    #     if map_max is None: map_max = np.nanmax(hpmap)
+    #     is_in = (map_min <= hpmap) & (hpmap <= map_max) #True if counts in bounds
+    #     if fromMap == "":
+    #         print("Attribut map has no attribut mask. Using mask from mapMasked instead.")
+    #         fromMap = "Masked"
+    #     self.set_cutMask(is_in, invert=True, fromMap=fromMap, toMap=toMap)
 
 
 
