@@ -7,8 +7,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from astropy.table import Table, vstack, MaskedColumn
 
-try: from simulMap import raDec2map_Table
-except: from Simulation.simulMap import raDec2map_Table
+try:
+    from simulMap import raDec2map_Table, apply_dipole_MD, apply_dipole_ARaDec
+    from fitMap import fit_dipole_err
+except:
+    from Simulation.simulMap import raDec2map_Table, apply_dipole_MD, apply_dipole_ARaDec
+    from Simulation.fitMap import fit_dipole_err
 
 
 ##### Parent class to all others: ##### 
@@ -18,17 +22,33 @@ class Mapper():
     _settingsPlot = {"graticule": True, #default settings to use in self.plot()
         "graticule_labels": True,
         "xlabel": "RA", "ylabel": "DEC"}
+    _settingsFit_MD = {"bounds": ([0, 0, 0, -90], [np.inf, 1, 360, 90]), #default settings to use in self.fit_dipole()
+        "names": ("M", "A", "ra", "dec")}
+    _settingsFit_D = {"bounds": ([0, 0, -90], [1, 360, 90]), #default settings to use in self.fit_dipole()
+        "names": ("A", "ra", "dec")}
+    _settingsFit = {"MD": _settingsFit_MD, "D": _settingsFit_D}
     
     def __init__(self, data, nest: bool = True, hpmap=None, dataName="table"): #called "hpmap" rather than "map" to avoid risk to confuse with map() python function.
         self.nest = nest
         self.__dict__[dataName] = data
         if hpmap is not None: self.__dict__[self._mapNameBase] = hpmap
         self._instance_settingsPlot = {} #to create new default settings to use in self.plot(), specific to the instance.
+        #to create new default settings to use in self.fit_dipole(), specific to the instance.
+        self._instance_settingsFit_MD = {"model": lambda hpmap, M, A, ra, dec, contrast : apply_dipole_MD(hpmap, M, A, ra, dec, nest=self.nest, frame='icrs', contrast=contrast, cut_masked=True)}
+        self._instance_settingsFit_D = {"model": lambda hpmap, A, ra, dec, contrast : apply_dipole_ARaDec(hpmap, A, ra, dec, nest=self.nest, cut_masked=True)}
+        self._instance_settingsFit = {"MD": self._instance_settingsFit_MD, "D": self._instance_settingsFit_D}
 
     
     def _set_instance_settingsPlot(self, **kwargs):
         """Allow to set default settings specific to the instance self, in order to be used in self.plot()."""
         self._instance_settingsPlot = self._instance_settingsPlot | kwargs  #take values in kwargs if their exist, else take values in self._instance_settingsPlot
+
+    
+    def _set_suffixTextPlot(self, sep=" for ", **kwargs):
+        """Allow to set a suffix to texts like unit or xlabel in default settings specific to the instance self, in order to be used in self.plot()."""
+        for k, v in kwargs.items():
+            self._instance_settingsPlot[k] = (self._settingsPlot | self._instance_settingsPlot)[k]
+            self._instance_settingsPlot[k] += sep+v
         
 
     def _select_useMap(self, suffix=''):
@@ -76,6 +96,25 @@ class Mapper():
         hp.projview(hpmap, nest=self.nest, **settings)
         plt.xlabel(xlabel)
         plt.ylabel(ylabel)
+
+    
+    def fit_dipole(self, use_map, init, fixed=[], contrast=False, plot_map=True, fit_monop=True, **kwargs):
+        """Return the result of a dipole fit. Can fit either with monopole or without."""
+        #Settings definition:
+        if fit_monop: settingsKey = "MD"
+        else: settingsKey = "D"
+        settings = self._settingsFit[settingsKey] | self._instance_settingsFit[settingsKey] | kwargs
+        defaultModel = settings.pop("model")
+        model = kwargs.get("model", lambda hpmap, *args : defaultModel(hpmap, *args, contrast=contrast))
+
+        #Map definition and fit:
+        hpmap = self._select_useMap(use_map) #choosing which attribut map to fit.
+        title_map = settings.pop("title_map", "") #title for plot()
+        if plot_map: self.plot(use_map=use_map, title = title_map)
+        if "title_fit" in settings.keys(): settings["title"] = settings["title_fit"] #title for plot_fit(); require "title" in kwargs
+        m = fit_dipole_err(model, hpmap, init, fixed=fixed, **settings)
+        return m
+        
 
 
 
