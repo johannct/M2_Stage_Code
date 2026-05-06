@@ -159,8 +159,9 @@ def generate_lumMag(N, L_min=1e7, L_max=1e11,  L_star=1e10, alpha=-1.1, z_min=0.
 
     print("\nGenerating redshifts")
     z = generate_redshift(N, z_min, z_max) #Redshift
+    print("\nGenerating dL")
     dL_mpc = np.array([get_dL(zi, H0, Om, Ol, c) for zi in z]) #luminosity distance in Mpc
-    print("\nGenerating luminosities") 
+    print("Generating luminosities") 
     L = generate_schechter_lum(N, L_star, alpha, L_min, L_max, phi_star) #luminosities
     M = lum2absMag(L, M_sun, L_sun) #Absolute magnitudes
     m = M + 5*np.log10(dL_mpc) + 25 #Aparent magnitudes

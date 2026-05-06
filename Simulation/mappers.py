@@ -85,20 +85,44 @@ class DensityMapper(Mapper):
     _settingsPlot = Mapper._settingsPlot | {
         "unit": "Source density in $[\deg^{-2}]$"} #default settings to use in self.plot()
     
-    def __init__(self, data, nside: int, nest: bool = True, hpmap=None):
-        self.nside = nside
-        self.area_deg2 = hp.nside2pixarea(self.nside, degrees=True)
+    def __init__(self, data, nside: int, nest: bool = True, hpmap=None, get_grouped=False):
         super().__init__(data=data, nest=nest, hpmap=hpmap)
-        if hpmap is None: self.__dict__[self._mapNameBase] = raDec2map_Table(self.nside, self.table, nest=self.nest)/self.area_deg2
+        if hpmap is None: replace_map = True
+        else: replace_map = False
+        self.get_nside(nside=nside, replace_map=replace_map, get_grouped=get_grouped)
     
     
-    def add(self, mapper):
+    def add(self, mapper, get_grouped: bool = False):
         """Add another DensityMapper to the instance, and return a new DensityMapper with:
         - new.map = self.map + mapper.map
         - new.table = vstack([self.table, mapper.table])"""
-        data = vstack([self.table, mapper.table])
+        if (self.table is None) or (mapper.table is None): data=None
+        else: data = vstack([self.table, mapper.table])
         hpmap = self.map + mapper.map
-        return self.__class__(data=data, nside=self.nside, nest=self.nside, hpmap=hpmap)
+        return self.__class__(data=data, nside=self.nside, nest=self.nside, hpmap=hpmap, get_grouped=get_grouped)
+
+    
+    def get_df_grouped(self, col_ipix='HealPIX', df_col=None):
+        try:
+            if df_col is None: df_col = [col for col in self.table.colnames if self.table[col].ndim == 1]
+            self.df = self.table[df_col].to_pandas()  #can only convert ndim=1 columns
+            self.df_grouped = self.df.groupby(col_ipix)
+        except: print("Could not create DataFrame from Table")
+    
+    
+    def get_nside(self, nside: int, replace_map: bool = True, get_grouped: bool = False, df_col=None):
+        #adding nside information:
+        self.nside = nside
+        self.area_deg2 = hp.nside2pixarea(self.nside, degrees=True)
+        if self.table is not None:
+            col_ipix = 'HealPIX'
+            if not col_ipix in self.table.columns: self.table[col_ipix] = hp.ang2pix(nside, self.table['RA'], self.table['DEC'], nest=self.nest, lonlat=True)
+
+        #adding DataFrames:
+        if get_grouped: self.get_df_grouped(col_ipix=col_ipix, df_col=df_col)
+
+        #adding map:
+        if replace_map: self.__dict__[self._mapNameBase] = raDec2map_Table(self.nside, self.table, nest=self.nest)/self.area_deg2
 
     
     def set_mask(self, mask=None, badval=0, **kwargs):
