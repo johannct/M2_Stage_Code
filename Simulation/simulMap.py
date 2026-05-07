@@ -132,6 +132,11 @@ def gauss(x,A,mu,sigma):
     return (A / (sigma*np.sqrt(2*np.pi)))* np.exp(-np.square(x-mu)/(2*sigma**2))
 
 
+def apply_monopole_Mcontrast(mapContrast, M):
+    """Return the count map, from a monopole M and a contrast map."""
+    return M*(1 + mapContrast)
+
+
 def get_pixSide(map, cut_masked=False):
     """From a map, return npix, nside, ipix."""
     npix = len(map) #nb. of pixels
@@ -166,7 +171,7 @@ def apply_dipole_ARaDec(map, A, ra, dec, nest, cut_masked=False):
 
 
 def apply_dipole_MD(map, M, D0, D1, D2, nest, frame='icrs', contrast=True, cut_masked=False):
-    """Returned the measured map, when it is modified by a a monopole M and a kinematic dipole D, depending on the true map."""
+    """Return the measured map, when it is modified by a a monopole M and a kinematic dipole D, depending on the true map."""
     if frame == 'icrs': Acostheta = apply_dipole_ARaDec(map, D0, D1, D2, nest, cut_masked)
     elif frame == 'galactic': Acostheta = apply_dipole_Alb(map, D0, D1, D2, nest, cut_masked)
     elif frame == 'cartesian':
