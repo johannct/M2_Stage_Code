@@ -23,7 +23,7 @@ class Mapper():
         "graticule_labels": True,
         "xlabel": "RA", "ylabel": "DEC"}
     _settingsFit_MD = {"bounds": ([0, 0, 0, -90], [np.inf, 1, 360, 90]), #default settings to use in self.fit_dipole()
-        "names": ("M", "A", "ra", "dec")}
+        "names": ("N*", "A", "ra", "dec")}
     _settingsFit_D = {"bounds": ([0, 0, -90], [1, 360, 90]), #default settings to use in self.fit_dipole()
         "names": ("A", "ra", "dec")}
     _settingsFit = {"MD": _settingsFit_MD, "D": _settingsFit_D}
