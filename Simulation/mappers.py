@@ -114,6 +114,15 @@ class Mapper():
         if "title_fit" in settings.keys(): settings["title"] = settings["title_fit"] #title for plot_fit(); require "title" in kwargs
         m = fit_dipole_err(model, hpmap, init, fixed=fixed, **settings)
         return m
+
+
+    def fillna(self, from_map="", fill_value=0, to_map="Filled", inplace=True):
+        hpmap = self._select_useMap(from_map)
+        hpmap[np.isnan(hpmap)] = fill_value
+        if inplace: to_map = from_map
+        self.__dict__[self._mapNameBase + to_map] = hpmap  #not use self._create_newMap because does not allow to modify original base map.
+        
+        
         
 
 

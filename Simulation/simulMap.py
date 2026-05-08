@@ -181,3 +181,10 @@ def apply_dipole_MD(map, M, D0, D1, D2, nest, frame='icrs', contrast=True, cut_m
         Acostheta = np.dot(D, u_source)
     if contrast: return M + Acostheta
     else: return M*(1 + Acostheta)
+
+
+def renormalize(v):
+    var = v.copy()
+    var_min = var.min()
+    var_max = var.max()
+    return (var - var_min) / (var_max - var_min)
