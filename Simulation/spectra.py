@@ -18,6 +18,60 @@ except:
 class Spectrum():
     """A class to read and manipulate spectra."""
     
+    def __init__(self, flux, wave):
+        self.flux, self.wavelength = flux, wave
+        
+
+    def _select_useFlux(self, suffix=''):
+        """Retun the attribut flux represented by suffix. Especially used to choose which attribut flux a method has to act on.
+        Example of values for suffix:
+        - "" : return self.flux (default)
+        - "Filter" : return self. self.flux_Filter"""
+        flux = self.__dict__["flux" + suffix].copy()
+        return flux
+
+
+    def apply_gaussianFilter(self, sigma):
+        self.fluxFilter = gaussian_filter(self.flux, sigma)
+
+    
+    def apply_savgolFilter(self, window_length, polyorder):
+        self.fluxFilter = savgol_filter(self.flux, window, poly)
+
+
+    def plot(self, use_flux='', **kwargs):
+        flux =  self._select_useFlux(use_flux)
+        wave =  self.wavelength.copy()
+        z_renorm = kwargs.get('z_renorm', None)
+        if z_renorm is not None: wave /= (1+z_renorm)
+        
+        if "figax" in kwargs.keys(): fig, ax = kwargs["figax"] #figax have to be tuple (fig, ax).
+        else: fig, ax = plt.subplots(figsize=(12, 6))
+        ax.plot(wave, flux)
+        
+        title = kwargs.get('title', "Spectrum")
+        xscale = kwargs.get('xscale', 'log')
+        yscale = kwargs.get('yscale', 'log')
+        ax.set_title(title)
+        ax.set_xscale(xscale)
+        ax.set_yscale(yscale)
+        ax.set_xlabel("Wave Length [Angström]")
+        ax.set_ylabel("Flux $[erg/s/cm^2/Hz]$")
+        return fig, ax
+
+    
+    @classmethod
+    def read_sed(cls, filename):
+        with open(filename, "r") as sed:
+            wave, flux = np.loadtxt(sed, dtype='float', usecols=(0,1), unpack=True)
+        return cls(flux=flux, wave=wave)
+        
+
+
+
+class Spectrum3bands():
+    """A class to read and manipulate spectra with 3 bands (B, R, Z)S."""
+    
     def __init__(self, flux_b, flux_r, flux_z, wave_b, wave_r, wave_z, target_ID=None):
         self.target_ID = target_ID
         self.flux_b, self.flux_r, self.flux_z = flux_b, flux_r, flux_z
