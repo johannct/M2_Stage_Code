@@ -155,7 +155,7 @@ class CountMapper(Mapper):
         if (self.table is None) or (mapper.table is None): data=None
         else: data = vstack([self.table, mapper.table])
         hpmap = self.map + mapper.map
-        return self.__class__(data=data, nside=self.nside, nest=self.nside, hpmap=hpmap, get_grouped=get_grouped)
+        return self.__class__(data=data, nside=self.nside, nest=self.nest, hpmap=hpmap, get_grouped=get_grouped)
 
     
     def get_df_grouped(self, col_ipix='HealPIX', df_col=None):
