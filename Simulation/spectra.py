@@ -1,5 +1,6 @@
 """A package containing classes to manipulate spectra."""
 
+## Package importation:
 import fitsio
 import numpy as np
 import healpy as hp
@@ -15,20 +16,71 @@ except:
     from Simulation.simulMap import *
 
 
+
+### Constants definition:
+LSST_Bands = pd.DataFrame({"u": (304.30, 403.50), "g": (385.60, 566.30), "r": (533.70, 705.70),
+              "i": (669.90, 837.80), "z": (799.30, 939.20), "y": (907.50, 1100.00)})
+
+
+
+### Classes definition:
 class Spectrum():
     """A class to read and manipulate spectra."""
+    _settingsPlot = {"xname": "Wave Length", "xunit": "Angström", #default settings to use in self.plot()
+        "yname": "Flux", "yunit": "erg/s/cm^2/A",
+        "xscale": "linear", "yscale": "linear"}
     
     def __init__(self, flux, wave):
         self.flux, self.wavelength = flux, wave
+        self._instance_settingsPlot = {} #to create new default settings to use in self.plot(), specific to the instance.
+
+    
+    def _set_instance_settingsPlot(self, **kwargs):
+        """Allow to set default settings specific to the instance self, in order to be used in self.plot()."""
+        self._instance_settingsPlot = self._instance_settingsPlot | kwargs  #take values in kwargs if their exist, else take values in self._instance_settingsPlot
+
+    def _select_settingsPlot(self, **kwargs):
+        title = kwargs.pop('title', "Spectrum")
+        xscale = kwargs.pop('xscale')
+        yscale = kwargs.pop('yscale')
+        loglog = kwargs.pop('loglog', False)
+        if loglog: xscale, yscale = 'log', 'log'
+        
+        xname = kwargs.pop('xname')
+        yname = kwargs.pop('yname')
+        xunit = kwargs.pop('xunit')
+        yunit = kwargs.pop('yunit')
+        xlabel = kwargs.pop('xlabel', f"{xname} [${xunit}$]")
+        ylabel = kwargs.pop('ylabel', f"{yname} [${yunit}$]")
+        return kwargs, title, xscale, yscale, xlabel, ylabel
         
 
-    def _select_useFlux(self, suffix=''):
+    def _select_useFlux(self, suffix='', band=None):
         """Retun the attribut flux represented by suffix. Especially used to choose which attribut flux a method has to act on.
         Example of values for suffix:
         - "" : return self.flux (default)
         - "Filter" : return self. self.flux_Filter"""
+        if band is not None: suffix = f"_{band}{suffix}"
         flux = self.__dict__["flux" + suffix].copy()
         return flux
+
+    
+    def _select_useBand(self, band, use_flux=''):
+        """Retun the attribut wave and flux for the given band.
+        Parameter band: name of the band; must be a string."""
+        if band is not None: wave = self.__dict__["wave_" + band].copy()
+        else: wave = self.wavelength.copy()
+        flux = self._select_useFlux(suffix=use_flux, band=band)
+        return wave, flux
+
+    
+    @classmethod
+    def read_sed(cls, filename, yname="SED", yunit="erg/s/cm^2/Hz"):
+        with open(filename, "r") as sed:
+            wave, flux = np.loadtxt(sed, dtype='float', usecols=(0,1), unpack=True)
+        spectum = cls(flux=flux, wave=wave)
+        spectum._set_instance_settingsPlot(yname=yname, yunit=yunit)
+        return spectum
 
 
     def apply_gaussianFilter(self, sigma):
@@ -38,33 +90,41 @@ class Spectrum():
     def apply_savgolFilter(self, window_length, polyorder):
         self.fluxFilter = savgol_filter(self.flux, window, poly)
 
+    
+    def get_bands(self, band=LSST_Bands, nm2angström=True):
+        """Add band attributs to the instance self from a dictionnary or a DataFrame band defining the name of the band and the min and max waveleangths."""
+        bands = band.copy()
+        bands = pd.DataFrame(bands)
+        if nm2angström: bands = bands*10
+        self.bands_name = list(bands.columns)
+        for k, (wmin, wmax) in bands.items():
+            mask = (self.wavelength >= wmin) & (self.wavelength <= wmax)
+            wave_cut = self.wavelength[mask]
+            flux_cut = self.flux[mask]
+            self.__dict__[f"wave_{k}"] = wave_cut
+            self.__dict__[f"flux_{k}"] = flux_cut
 
-    def plot(self, use_flux='', **kwargs):
-        flux =  self._select_useFlux(use_flux)
-        wave =  self.wavelength.copy()
-        z_renorm = kwargs.get('z_renorm', None)
+
+    def plot(self, use_flux='', band=None, **kwargs):
+        settings = self._settingsPlot | self._instance_settingsPlot | kwargs
+        # flux =  self._select_useFlux(use_flux)
+        # wave =  self.wavelength.copy()
+        wave, flux = self._select_useBand(band=band, use_flux=use_flux)
+        z_renorm = settings.pop('z_renorm', None)
         if z_renorm is not None: wave /= (1+z_renorm)
         
-        if "figax" in kwargs.keys(): fig, ax = kwargs["figax"] #figax have to be tuple (fig, ax).
+        if "figax" in settings.keys(): fig, ax = settings.pop("figax") #figax have to be tuple (fig, ax).
         else: fig, ax = plt.subplots(figsize=(12, 6))
-        ax.plot(wave, flux)
+        settings, title, xscale, yscale, xlabel, ylabel = self._select_settingsPlot(**settings)
         
-        title = kwargs.get('title', "Spectrum")
-        xscale = kwargs.get('xscale', 'log')
-        yscale = kwargs.get('yscale', 'log')
+        ax.plot(wave, flux, **settings)
         ax.set_title(title)
         ax.set_xscale(xscale)
         ax.set_yscale(yscale)
-        ax.set_xlabel("Wave Length [Angström]")
-        ax.set_ylabel("Flux $[erg/s/cm^2/Hz]$")
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        if 'label' in settings.keys(): ax.legend()
         return fig, ax
-
-    
-    @classmethod
-    def read_sed(cls, filename):
-        with open(filename, "r") as sed:
-            wave, flux = np.loadtxt(sed, dtype='float', usecols=(0,1), unpack=True)
-        return cls(flux=flux, wave=wave)
         
 
 
