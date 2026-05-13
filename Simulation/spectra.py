@@ -20,6 +20,7 @@ except:
 ### Constants definition:
 LSST_Bands = pd.DataFrame({"u": (304.30, 403.50), "g": (385.60, 566.30), "r": (533.70, 705.70),
               "i": (669.90, 837.80), "z": (799.30, 939.20), "y": (907.50, 1100.00)})
+    
 
 
 
@@ -125,6 +126,40 @@ class Spectrum():
         ax.set_ylabel(ylabel)
         if 'label' in settings.keys(): ax.legend()
         return fig, ax
+
+    
+    def get_surrounding(self, spectr):
+        wave_1, wave_2 = spectr.wavelength.copy(), self.wavelength.copy()
+        flux_1 = spectr.flux.copy()
+        idx_max = np.searchsorted(wave_1, wave_2)
+        idx_min = idx_max - 1
+        
+        #Avoiding wavelengths out of range:
+        mask_min = (idx_min >= 0) & (idx_min < len(wave_1))
+        mask_max = (idx_max >= 0) & (idx_max < len(wave_1))
+        idx_min, idx_max = idx_min[mask_min], idx_max[mask_max]
+        
+        wave_min, flux_min = wave_2.copy(), np.zeros_like(wave_2)
+        wave_max, flux_max = wave_min.copy(), flux_min.copy()
+        
+        wave_min[mask_min] = wave_1[idx_min]
+        wave_max[mask_max] = wave_1[idx_max]
+        wave_new =  np.row_stack([wave_min, wave_max])
+        
+        flux_min[mask_min] = flux_1[idx_min]
+        flux_max[mask_max] = flux_1[idx_max]
+        flux_new =  np.row_stack([flux_min, flux_max])
+        #return self.__class__(wave=wave_new, flux=flux_new)
+        return wave_new, flux_new
+
+
+    def integrate(self, response=1):
+        product = self.flux*response
+        return np.trapz(product, x=self.wavelength)
+
+
+    def ratio_integrate(self, response):
+        return self.integrate(response) / self.integrate()
         
 
 

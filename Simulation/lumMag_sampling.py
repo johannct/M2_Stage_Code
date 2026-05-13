@@ -148,7 +148,7 @@ def get_dL(zi, H0=67.4, Om=0.315, Ol=0.685, c=3e8):
     return (c / H0) * (1 + zi) * integral
 
 
-def generate_lumMag(N, L_min=1e7, L_max=1e11,  L_star=1e10, alpha=-1.1, z_min=0.01, z_max=3.0, phi_star=1, to_table=True, **kwargs):
+def generate_lumMag(N, L_min=1e7, L_max=1e11,  L_star=1e10, alpha=-1.1, z_min=0.01, z_max=3.0, phi_star=1, L_bandRatio=1, to_table=True, **kwargs):
     #Cosmological Parameters  (Planck 2018):
     H0 = kwargs.get('H0', 67.4)
     Om = kwargs.get('Om', 0.315)
@@ -163,6 +163,7 @@ def generate_lumMag(N, L_min=1e7, L_max=1e11,  L_star=1e10, alpha=-1.1, z_min=0.
     dL_mpc = np.array([get_dL(zi, H0, Om, Ol, c) for zi in z]) #luminosity distance in Mpc
     print("Generating luminosities") 
     L = generate_schechter_lum(N, L_star, alpha, L_min, L_max, phi_star) #luminosities
+    L = L*L_bandRatio               #from bolometric to band
     M = lum2absMag(L, M_sun, L_sun) #Absolute magnitudes
     m = M + 5*np.log10(dL_mpc) + 25 #Aparent magnitudes
 
