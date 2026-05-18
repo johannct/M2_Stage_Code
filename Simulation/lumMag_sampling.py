@@ -1,13 +1,19 @@
 '''A module containing several useful functions to simulate luminosities and magnitudes.'''
 
 import numpy as np
+import pandas as pd
 import astropy.units as u
 from astropy.table import Table
 from scipy.integrate import quad
 from scipy.stats import gamma
+import pyccl as ccl
 
-try: from simulMap import nz_model
-except: from Simulation.simulMap import nz_model
+try:
+    from simulMap import nz_model
+    from spectra import Spectrum
+except:
+    from Simulation.simulMap import nz_model
+    from Simulation.spectra import Spectrum
 
 
 ### Functions definition:
@@ -21,8 +27,18 @@ def lum2absMag(L, M_sun=4.83, L_sun=1):
     return M_sun - 2.5*np.log10(L/L_sun)
 
 
+def absMag2lum(M, M_star):
+    """Return the luminosity from the absolute magnitude M and a reference  absolute magnitude M_sar."""
+    return 10**(0.4 * (M_star - M))
+
+
 def lum2flux(L, dL):
     return L/(4*np.pi * (dL**2))
+
+
+def lumBolom2lumBand(L, sed, response, renorm=True):
+    if renorm: sed = sed.renormalize(L)
+    return sed.integrate(response)
 
 
 ## Sampling functions:
@@ -148,11 +164,29 @@ def get_dL(zi, H0=67.4, Om=0.315, Ol=0.685, c=3e8):
     return (c / H0) * (1 + zi) * integral
 
 
-def generate_lumMag(N, L_min=1e7, L_max=1e11,  L_star=1e10, alpha=-1.1, z_min=0.01, z_max=3.0, phi_star=1, L_bandRatio=1, to_table=True, **kwargs):
+def get_dL_cosmo(z, Omega_c=0.25, Omega_b=0.05, h=0.67, sigma8=0.8, n_s=0.96, cosmo=None):
+    if cosmo is None: cosmo = ccl.Cosmology(
+        Omega_c=Omega_c,
+        Omega_b=Omega_b,
+        h=h,
+        sigma8=sigma8,
+        n_s=n_s
+    )
+    a = 1.0 / (1.0 + z)
+    return ccl.luminosity_distance(cosmo, a)
+
+
+def generate_lumMag(N, L_min=1e7, L_max=1e11,  L_star=1e10, alpha=-1.1, z_min=0.01, z_max=3.0, phi_star=1, L_bandRatio=1, sed=None, response=1, renorm=True, to_table=True, **kwargs):
     #Cosmological Parameters  (Planck 2018):
     H0 = kwargs.get('H0', 67.4)
     Om = kwargs.get('Om', 0.315)
     Ol = kwargs.get('Ol', 0.685)
+    Oc = kwargs.get('Oc', 0.25)
+    Ob = kwargs.get('Ob', 0.05)
+    h = kwargs.get('h', 0.67)
+    sigma8 = kwargs.get('sigma8', 0.8)
+    n_s = kwargs.get('n_s', 0.8)
+    cosmo = kwargs.get('cosmo', None)
     c = kwargs.get('c', 3e5) #speed of ligt in km/s (because H0 is in Km/s/Mpc)
     M_sun = kwargs.get('M_sun', 4.83) #Absolute magnitude of Sun
     L_sun = kwargs.get('L_sun', 1) #Luminosity of Sun
@@ -160,10 +194,15 @@ def generate_lumMag(N, L_min=1e7, L_max=1e11,  L_star=1e10, alpha=-1.1, z_min=0.
     print("\nGenerating redshifts")
     z = generate_redshift(N, z_min, z_max) #Redshift
     print("\nGenerating dL")
-    dL_mpc = np.array([get_dL(zi, H0, Om, Ol, c) for zi in z]) #luminosity distance in Mpc
-    print("Generating luminosities") 
+    #dL_mpc = np.array([get_dL(zi, H0, Om, Ol, c) for zi in z]) #luminosity distance in Mpc
+    dL_mpc = get_dL_cosmo(z, Oc, Ob, h, sigma8, n_s, cosmo) #luminosity distance in Mpc
+    print("\nGenerating luminosities") 
     L = generate_schechter_lum(N, L_star, alpha, L_min, L_max, phi_star) #luminosities
-    L = L*L_bandRatio               #from bolometric to band
+    if sed is not None:
+        print("\nConverting to band luminosities")
+        L = pd.DataFrame({"L": L})
+        L = np.array(L['L'].apply(lumBolom2lumBand, args=(sed, response, renorm))) #from bolometric to band
+    else: L = L*L_bandRatio               #from bolometric to band
     M = lum2absMag(L, M_sun, L_sun) #Absolute magnitudes
     m = M + 5*np.log10(dL_mpc) + 25 #Aparent magnitudes
 

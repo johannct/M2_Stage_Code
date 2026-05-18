@@ -9,6 +9,7 @@ from astropy.table import Table
 import matplotlib.pyplot as plt
 from scipy.ndimage import gaussian_filter
 from scipy.signal import savgol_filter
+from scipy.integrate import simpson
 
 try:
     from simulMap import *
@@ -31,9 +32,13 @@ class Spectrum():
         "yname": "Flux", "yunit": "erg/s/cm^2/A",
         "xscale": "linear", "yscale": "linear"}
     
-    def __init__(self, flux, wave):
-        self.flux, self.wavelength = flux, wave
+    def __init__(self, flux, wave, by_lam=True, c=3e8*1e10): #c in angström/s
+        self.flux = flux
         self._instance_settingsPlot = {} #to create new default settings to use in self.plot(), specific to the instance.
+        self.c_light = c
+        self.by_lam = by_lam
+        if by_lam: self.wavelength, self.nu = wave, c/wave
+        else: self.wavelength, self.nu = c/wave, wave
 
     
     def _set_instance_settingsPlot(self, **kwargs):
@@ -51,8 +56,8 @@ class Spectrum():
         yname = kwargs.pop('yname')
         xunit = kwargs.pop('xunit')
         yunit = kwargs.pop('yunit')
-        xlabel = kwargs.pop('xlabel', f"{xname} [${xunit}$]")
-        ylabel = kwargs.pop('ylabel', f"{yname} [${yunit}$]")
+        xlabel = kwargs.pop('xlabel', f"{xname} [${xunit}$]" if xunit else xname)
+        ylabel = kwargs.pop('ylabel', f"{yname} [${yunit}$]" if yunit else yname)
         return kwargs, title, xscale, yscale, xlabel, ylabel
         
 
@@ -108,8 +113,6 @@ class Spectrum():
 
     def plot(self, use_flux='', band=None, **kwargs):
         settings = self._settingsPlot | self._instance_settingsPlot | kwargs
-        # flux =  self._select_useFlux(use_flux)
-        # wave =  self.wavelength.copy()
         wave, flux = self._select_useBand(band=band, use_flux=use_flux)
         z_renorm = settings.pop('z_renorm', None)
         if z_renorm is not None: wave /= (1+z_renorm)
@@ -119,7 +122,7 @@ class Spectrum():
         settings, title, xscale, yscale, xlabel, ylabel = self._select_settingsPlot(**settings)
         
         ax.plot(wave, flux, **settings)
-        ax.set_title(title)
+        if title: ax.set_title(title)
         ax.set_xscale(xscale)
         ax.set_yscale(yscale)
         ax.set_xlabel(xlabel)
@@ -149,23 +152,31 @@ class Spectrum():
         flux_min[mask_min] = flux_1[idx_min]
         flux_max[mask_max] = flux_1[idx_max]
         flux_new =  np.row_stack([flux_min, flux_max])
-        #return self.__class__(wave=wave_new, flux=flux_new)
+        #return self.__class__(wave=wave_new, flux=flux_new, by_lam=self.by_lam, c=self.c_light)
         return wave_new, flux_new
 
 
     def integrate(self, response=1):
         product = self.flux*response
-        return np.trapz(product, x=self.wavelength)
+        if self.by_lam:
+            product = -product*self.c_light*(self.wavelength**(-2))
+            #return np.trapz(product, x=self.wavelength)
+            return simpson(product, x=self.wavelength)
+        else: return simpson(product, x=self.nu)
 
 
     def ratio_integrate(self, response):
         return self.integrate(response) / self.integrate()
-        
+
+
+    def renormalize(self, L):
+        flux = L*self.flux / self.integrate()
+        return self.__class__(wave=self.wavelength, flux=flux, by_lam=self.by_lam, c=self.c_light)
 
 
 
 class Spectrum3bands():
-    """A class to read and manipulate spectra with 3 bands (B, R, Z)S."""
+    """A class to read and manipulate spectra with 3 bands (B, R, Z)."""
     
     def __init__(self, flux_b, flux_r, flux_z, wave_b, wave_r, wave_z, target_ID=None):
         self.target_ID = target_ID
