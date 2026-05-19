@@ -176,7 +176,7 @@ def get_dL_cosmo(z, Omega_c=0.25, Omega_b=0.05, h=0.67, sigma8=0.8, n_s=0.96, co
     return ccl.luminosity_distance(cosmo, a)
 
 
-def generate_lumMag(N, L_min=1e7, L_max=1e11,  L_star=1e10, alpha=-1.1, z_min=0.01, z_max=3.0, phi_star=1, L_bandRatio=1, sed=None, response=1, renorm=True, to_table=True, **kwargs):
+def generate_lumMag(N, L_min=1e7, L_max=1e11,  L_star=1e10, alpha=-1.1, z_min=0.1, z_max=3.0, phi_star=1, L_bandRatio=1, sed=None, response=1, renorm=True, to_table=True, **kwargs):
     #Cosmological Parameters  (Planck 2018):
     H0 = kwargs.get('H0', 67.4)
     Om = kwargs.get('Om', 0.315)

@@ -53,10 +53,10 @@ def nz_model(z, sigma=0.5, beta=1.5):
     return z**2 * np.exp(-(z/sigma)**beta)
 
 
-def build_nz(zmin):
-    z = np.linspace(0.01, 3.0, 400)
+def build_nz_model(zmin, zmax, size):
+    z = np.linspace(0.01, zmax, size) #to avoid Cl discontinuities at low ell.
     nz = nz_model(z)
-    nz[z < zmin] = 0
+    nz[z < zmin] = 0 #to avoid Cl discontinuities at low ell.
     nz /= np.trapz(nz, z)
     return z, nz
 
