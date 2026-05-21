@@ -94,8 +94,8 @@ class Mapper():
         xlabel, ylabel = settings.pop("xlabel"), settings.pop("ylabel")
         hpmap = self._select_useMap(use_map) #choosing which attribut map to plot.
         hp.projview(hpmap, nest=self.nest, **settings)
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
+        if xlabel: plt.xlabel(xlabel)
+        if ylabel: plt.ylabel(ylabel)
 
     
     def fit_dipole(self, use_map, init, fixed=[], contrast=False, plot_map=True, fit_monop=True, **kwargs):

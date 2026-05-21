@@ -10,8 +10,12 @@ import matplotlib.pyplot as plt
 from iminuit import Minuit
 from iminuit.cost import LeastSquares
 
-try: from utile_fitsFile import *
-except: from Simulation.utile_fitsFile import *
+try:
+    from utile_fitsFile import *
+    from simulMap import get_savefig
+except:
+    from Simulation.utile_fitsFile import *
+    from Simulation.simulMap import get_savefig
 
 
 
@@ -47,33 +51,35 @@ def plot_fit(x_fit, y_fit, values, model, **kwargs):
     return fig, ax
 
 
-def get_LeastSquare_plot(least_square, param, index=-2, start=0, stop=1e7, step=10000, **kwargs):
+def get_LeastSquare_plot(least_square, param, index=-2, start=0, stop=1e7, step=10000, get_fig=False, **kwargs):
     '''Plot the LeastSquare function of a fit vs. param[index].'''
-    par = param.copy()
+    if type(param) == tuple: par = list(param)
+    else: par = param.copy()
     parx = np.linspace(start, stop, step)
     ls = []
     for x in parx:
         par[index] = x
         ls.append(least_square(*par))
-    
-    fig, ax = plt.subplots()
-    ax.plot(parx, ls)
-    xlabel = kwargs.get("xlabel", "param[{}]".format(index))
+
+    output_path = kwargs.pop("output_path", False) #to save the figure.
+    ext = kwargs.pop('format', 'pdf')
+    if "figax" in kwargs.keys(): fig, ax = kwargs.pop("figax") #figax have to be tuple (fig, ax).
+    else: fig, ax = plt.subplots()
+    xlabel = kwargs.pop("xlabel", "param[{}]".format(index))
+    if "title" in kwargs.keys(): ax.set_title(kwargs.pop("title"))
+    ax.plot(parx, ls, **kwargs)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("$\chi_2$ function")
-    if "title" in kwargs.keys(): ax.set_title(kwargs["title"])
     
-    output_path = kwargs.get("output_path", False)
-    if output_path:
-        ext = kwargs.get('format', 'pdf')
-        get_savefig(fig=fig, output_path=output_path, sufix="chi2_vs_param{}".format(index), format=ext)
+    if output_path: get_savefig(fig=fig, output_path=output_path, sufix="chi2_vs_param{}".format(index), format=ext)
     
-    return ls
+    if get_fig: return ls, fig, ax
+    else: return ls
 
 
 
 ## Fit functions:
-def fit_minuit(x_fit, y_fit, y_err, model, init, par_name, bounds=None, fixed=[], get_fig=False, plot_fig=True, **kwargs):
+def fit_minuit(x_fit, y_fit, y_err, model, init, par_name, bounds=None, fixed=[], get_fig=False, get_cost=False, plot_fig=True, **kwargs):
     '''Fit data with iminuit and the least squares methode, and return the corresponding Minuit() instance.
     Also show the figure with both data and fit, by using plot_fit(x_fit, y_fit, values, model, **kwargs).
 
@@ -86,6 +92,7 @@ def fit_minuit(x_fit, y_fit, y_err, model, init, par_name, bounds=None, fixed=[]
 
     Optionnal parameters:
     - get_fig: if True, return also the fig, ax variables from the data&fit figure. By default, get_fig=False.
+    - get_cost: if True, return also the cost function used to the fit. By default, get_cost=False.
     '''
     verbose = kwargs.pop('verbose', True)
     weights = kwargs.pop('weights', None)
@@ -102,7 +109,12 @@ def fit_minuit(x_fit, y_fit, y_err, model, init, par_name, bounds=None, fixed=[]
 
     if plot_fig: fig, ax = plot_fit(x_fit, y_fit, m.values, model, **kwargs)
     else: get_fig = False #fig, ax only exist if plot_fig = True, so they can't be returned if plot_fig = False.
-    if get_fig: return m, fig, ax
+    result = [m]
+    if get_cost: result.append(cost_func)
+    if get_fig:
+        result.append(fig)
+        result.append(ax)
+    if len(result) > 1: return tuple(result)
     else: return m
 
 

@@ -75,6 +75,17 @@ def cut_m52map(m, m5, chunk_size=1e4):
 
 
 
+## Conversion functions:
+def raDec2lb(ra, dec):
+    coord = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, frame="icrs")
+    return coord.galactic.l.value, coord.galactic.b.value
+
+def lb2raDec(l, b):
+    coord = SkyCoord(l=l*u.degree, b=b*u.degree, frame="galactic")
+    return coord.icrs.ra.value, coord.icrs.dec.value
+
+
+
 ## Plot functions:
 def get_savefig(fig, output_path, sufix, **kwargs):
     """Save the figure fig; several format for the images can be chosen in the same time, by inputing a tuple or a list in the parmateer format.

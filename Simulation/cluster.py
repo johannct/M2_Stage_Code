@@ -27,7 +27,7 @@ def get_Cl_ccl(nside, zmin=0.1, zmax=3.0, size=400, build_nz=build_nz_model, Ome
     )
 
     cl = ccl.angular_cl(cosmo, tracer, tracer, ell, l_limber='auto')
-    #print("Cl[ℓ=1] =", cl[0])
+    #print("Cl[ℓ=1] =", cl[1])
     if get_ell: return cl, ell
     else: return cl
 
