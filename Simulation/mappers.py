@@ -28,6 +28,7 @@ class Mapper():
         "names": ("A", "ra", "dec")}
     _settingsFit = {"MD": _settingsFit_MD, "D": _settingsFit_D}
     
+    
     def __init__(self, data, nest: bool = True, hpmap=None, dataName="table"): #called "hpmap" rather than "map" to avoid risk to confuse with map() python function.
         self.nest = nest
         self.__dict__[dataName] = data
@@ -121,6 +122,12 @@ class Mapper():
         hpmap[np.isnan(hpmap)] = fill_value
         if inplace: to_map = from_map
         self.__dict__[self._mapNameBase + to_map] = hpmap  #not use self._create_newMap because does not allow to modify original base map.
+
+
+    def set_mapID(self, ID, inunit=True):
+        """Add an attribut ID to the instance. inunit is True, this ID will appear in the unit when plotting the map with self.plot."""
+        self.ID = ID
+        if inunit: self._set_suffixTextPlot(unit = f"Map ID : {ID}", sep="\nfor ")
         
         
         

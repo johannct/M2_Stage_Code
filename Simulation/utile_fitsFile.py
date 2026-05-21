@@ -66,3 +66,8 @@ def remove_HDU(original, clear, extNB):
                 
                 # On écrit en passant l'argument extname
                 fout.write(data, header=header, extname=name)
+
+
+def create_primaryHDU(outputfile, header_global):
+    with fitsio.FITS(outputfile, 'rw', clobber=True) as fits:
+        fits.write(None, header=header_global) # None bevause Primary is empy of data

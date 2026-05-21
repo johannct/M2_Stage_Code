@@ -195,9 +195,9 @@ def get_dicParam_minuit(m, mapID, add_param={}, to_pandas=True):
 
 
 def prep_df_to_fits(df):
-    """Prepare a dataframe to be saved in a fits file by adaoting some columns."""
+    """Prepare a dataframe to be saved in a fits file by adapting some columns."""
     data = df.copy()
-    data['Coord'] = data['Coord'].astype('U9')
+    if 'Coord' in data.columns: data['Coord'] = data['Coord'].astype('U9')
     for col in data.columns:
         if col.endswith('_fixed'):
             data[col].fillna(False, inplace=True)
@@ -211,7 +211,7 @@ def save_fit_minuit(dicMinuit, outputfile, HDU_target='FIT_MINUIT'):
         else:
             print(f"Coulndn't find HDU {HDU_target} in the data ; creating one.")
             fits.write(dicMinuit, extname=HDU_target)
-    print('Saving Dataframe results in {}'.format(output_file))
+    print('Saving Dataframe results in {}'.format(outputfile))
     print("Saving complete.")
 
 
@@ -221,6 +221,7 @@ def get_save_fit_dfMinuit(dfMinuit, outputfile, HDU_target='FIT_MINUIT'):
     data = fitsio.FITS(outputfile) #to avoid duplicates.
     if HDU_target in data: df = get_row_not_in(df, Table(data[HDU_target].read()))
     data.close()
+    if type(df) == pd.DataFrame: df = Table.from_pandas(df) #to be able to use as_array()
     dic = df.as_array()
     if len(dic) == 0: print(f'All the rows already exists in {HDU_target}, or empty table given. No row was saved.')
     else: save_fit_minuit(dic, outputfile, HDU_target)
