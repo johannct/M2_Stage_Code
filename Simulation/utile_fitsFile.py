@@ -9,10 +9,10 @@ from astropy.table import Table
 ### Functions definition:
 
 ## Queries functions:
-def get_indexID(fits, ID, HDU='MAPS'):
+def get_indexID(fits, ID, HDU='MAPS', col_ID="Map_ID"):
     if type(ID) == np.ndarray or type(ID) == list or type(ID) == tuple:
-        idx = [get_index(fits, id, HDU) for id in ID]
-    else: idx = fits[HDU].where(f'Map_ID == "{ID}"')
+        idx = [get_indexID(fits, id, HDU) for id in ID]
+    else: idx = fits[HDU].where(f'{col_ID} == "{ID}"')
     return idx
     
 

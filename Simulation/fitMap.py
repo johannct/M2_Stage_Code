@@ -77,6 +77,48 @@ def get_LeastSquare_plot(least_square, param, index=-2, start=0, stop=1e7, step=
     else: return ls
 
 
+def compareFit_val(df, x, y, xscale='log', yscale='linear', nsigma=1, **kwargs):
+    """Plot the comparison between the measured value y and the true one depending on a study parater x, when fit results are loaded in the dataframe df."""
+    x = x + "_true"
+    xlabel = kwargs.pop("xlabel", x)
+    ylabel = kwargs.pop("ylabel", y)
+    if "figax" in kwargs.keys(): fig, ax = kwargs["figax"] #figax have to be tuple (fig, ax).
+    else: fig, ax = plt.subplots()
+    
+    y_inf = df[y] - nsigma*df[y + "_err"]
+    y_sup = df[y] + nsigma*df[y + "_err"]
+    ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
+    ax.plot(df[x], df[y], label="Fit results")
+    ax.plot(df[x], df[y + "_true"], label="True value")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_xscale(xscale)
+    ax.set_yscale(yscale)
+    ax.legend()
+
+
+def compareFit_diff(df, x, y, xscale='log', yscale='linear', nsigma=1, **kwargs):
+    """Plot the difference between the measured value y and the true one depending on a study parater x, when fit results are loaded in the dataframe df."""
+    x = x + "_true"
+    ylegend = kwargs.pop("ylegend", y)
+    xlabel = kwargs.pop("xlabel", x)
+    ylabel = kwargs.pop("ylabel", f'abs({ylegend} - {ylegend}_true)')
+    if "figax" in kwargs.keys(): fig, ax = kwargs["figax"] #figax have to be tuple (fig, ax).
+    else: fig, ax = plt.subplots()
+    
+    y_diff = np.abs(df[y] - df[y + "_true"])
+    y_inf = y_diff - nsigma*df[y + "_err"]
+    y_sup = y_diff + nsigma*df[y + "_err"]
+    ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
+    ax.plot(df[x], y_diff, label=f"Difference {ylegend} - {ylegend}_true")
+    ax.hlines(0, df[x].min(), df[x].max(), linestyles="--", color="orange", label="y = 0")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel);
+    ax.set_xscale(xscale)
+    ax.set_yscale(yscale)
+    ax.legend()
+
+
 
 ## Fit functions:
 def fit_minuit(x_fit, y_fit, y_err, model, init, par_name, bounds=None, fixed=[], get_fig=False, get_cost=False, plot_fig=True, **kwargs):

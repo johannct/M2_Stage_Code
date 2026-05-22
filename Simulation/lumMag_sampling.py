@@ -7,13 +7,16 @@ from astropy.table import Table
 from scipy.integrate import quad
 from scipy.stats import gamma
 import pyccl as ccl
+import fitsio
 
 try:
     from simulMap import nz_model
     from spectra import Spectrum
+    from utile_fitsFile import get_indexID
 except:
     from Simulation.simulMap import nz_model
     from Simulation.spectra import Spectrum
+    from Simulation.utile_fitsFile import get_indexID
 
 
 ### Functions definition:
@@ -39,6 +42,13 @@ def lum2flux(L, dL):
 def lumBolom2lumBand(L, sed, response, renorm=True):
     if renorm: sed = sed.renormalize(L)
     return sed.integrate(response)
+
+
+def bolom2band_LbandRatio(L, dL_mpc, L_bandRatio, M_sun=4.83, L_sun=1):
+    Lband = L*L_bandRatio               #from bolometric to band
+    M = lum2absMag(Lband, M_sun, L_sun) #Absolute magnitudes
+    m = M + 5*np.log10(dL_mpc) + 25     #Aparent magnitudes
+    return Lband, M, m
 
 
 ## Sampling functions:
@@ -76,7 +86,7 @@ def proba_schechter_lumRatio(x, alpha, phi_star=1):
         return phi_star * np.power(x, alpha) * np.exp(-x)
 
 
-def acceptReject(N, sampling_func, acceptance_func, args, pmax_func=None):
+def acceptReject(N, sampling_func, acceptance_func, args, pmax_func=None, verbose=True):
     """Create a sample of size N by using an accept-reject test from a sampling function and an acceptance function.
     args is a tuple containing the arguments to give to sampling_func.
     acceptance_func is the function computing the acceptance ratio by acceptance_ratio = acceptance_func(x_cand)."""
@@ -100,12 +110,14 @@ def acceptReject(N, sampling_func, acceptance_func, args, pmax_func=None):
         samples.append(accepted)
         remaining -= len(accepted)
         
-    print('Number of rejects =', reject)
-    print(f"Accepted ratio = {int((total-reject)/total*100)}%")
+    
+    if verbose:
+        print('Number of rejects =', reject)
+        print(f"Accepted ratio = {int((total-reject)/total*100)}%")
     return np.concatenate(samples)[:N]
 
 
-def generate_redshift(N, z_min=None, z_max=None, sigma=0.5,  beta=1.5):
+def generate_redshift(N, z_min=None, z_max=None, sigma=0.5,  beta=1.5, verbose=True):
     """Generate N randomized redshifts, by using a reject test and nz_model distribution."""
     # Analytically finding the maximum: d/dz[dist] = 0
     # => 2z - beta/sigma * (z/sigma)^(beta-1) * z^2 = 0
@@ -133,11 +145,11 @@ def generate_redshift(N, z_min=None, z_max=None, sigma=0.5,  beta=1.5):
     acceptance_func = lambda z: nz_model(z, sigma, beta)
     pmax_func = lambda z: g_peak_ratio * g_dist.pdf(z)
     
-    samples = acceptReject(N, sampling_func, acceptance_func, args, pmax_func=pmax_func)
+    samples = acceptReject(N, sampling_func, acceptance_func, args, pmax_func=pmax_func, verbose=verbose)
     return np.array(samples)
     
 
-def generate_schechter_lumRatio(N, alpha, x_min, x_max, phi_star=1):
+def generate_schechter_lumRatio(N, alpha, x_min, x_max, phi_star=1, verbose=True):
     """Generate N randomized luminosities, by using a reject test and Schechter's law."""
     sampling_func = sample_truncated_power_law
     args = (alpha, x_min, x_max)
@@ -148,13 +160,13 @@ def generate_schechter_lumRatio(N, alpha, x_min, x_max, phi_star=1):
     # acceptance_ratio = np.exp(-L_cand)
     acceptance_func = lambda x: np.exp(-x)
     
-    samples = acceptReject(N, sampling_func, acceptance_func, args)
+    samples = acceptReject(N, sampling_func, acceptance_func, args, verbose=verbose)
     return np.array(samples)
 
 
-def generate_schechter_lum(N, L_star, alpha, L_min, L_max, phi_star):
+def generate_schechter_lum(N, L_star, alpha, L_min, L_max, phi_star, verbose=True):
     x_min, x_max = L_min/L_star, L_max/L_star
-    return L_star*generate_schechter_lumRatio(N, alpha, x_min, x_max, phi_star)
+    return L_star*generate_schechter_lumRatio(N, alpha, x_min, x_max, phi_star, verbose=verbose)
 
 
 def get_dL(zi, H0=67.4, Om=0.315, Ol=0.685, c=3e8):
@@ -176,7 +188,7 @@ def get_dL_cosmo(z, Omega_c=0.25, Omega_b=0.05, h=0.67, sigma8=0.8, n_s=0.96, co
     return ccl.luminosity_distance(cosmo, a)
 
 
-def generate_lumMag(N, L_min=1e7, L_max=1e11,  L_star=1e10, alpha=-1.1, z_min=0.1, z_max=3.0, phi_star=1, L_bandRatio=1, sed=None, response=1, renorm=True, to_table=True, **kwargs):
+def generate_lumMag(N, L_min=1e7, L_max=1e11,  L_star=1e10, alpha=-1.1, z_min=0.1, z_max=3.0, phi_star=1, L_bandRatio=1, sed=None, response=1, renorm=True, to_table=True, verbose=True, **kwargs):
     #Cosmological Parameters  (Planck 2018):
     H0 = kwargs.get('H0', 67.4)
     Om = kwargs.get('Om', 0.315)
@@ -191,15 +203,15 @@ def generate_lumMag(N, L_min=1e7, L_max=1e11,  L_star=1e10, alpha=-1.1, z_min=0.
     M_sun = kwargs.get('M_sun', 4.83) #Absolute magnitude of Sun
     L_sun = kwargs.get('L_sun', 1) #Luminosity of Sun
 
-    print("\nGenerating redshifts")
-    z = generate_redshift(N, z_min, z_max) #Redshift
-    print("\nGenerating dL")
+    if verbose: print("\nGenerating redshifts")
+    z = generate_redshift(N, z_min, z_max, verbose=verbose) #Redshift
+    if verbose: print("\nGenerating dL")
     #dL_mpc = np.array([get_dL(zi, H0, Om, Ol, c) for zi in z]) #luminosity distance in Mpc
     dL_mpc = get_dL_cosmo(z, Oc, Ob, h, sigma8, n_s, cosmo) #luminosity distance in Mpc
-    print("\nGenerating luminosities") 
-    L = generate_schechter_lum(N, L_star, alpha, L_min, L_max, phi_star) #luminosities
+    if verbose: print("\nGenerating luminosities") 
+    L = generate_schechter_lum(N, L_star, alpha, L_min, L_max, phi_star, verbose=verbose) #luminosities
     if sed is not None:
-        print("\nConverting to band luminosities")
+        if verbose: print("\nConverting to band luminosities")
         L = pd.DataFrame({"L": L})
         L = np.array(L['L'].apply(lumBolom2lumBand, args=(sed, response, renorm))) #from bolometric to band
     else: L = L*L_bandRatio               #from bolometric to band
@@ -212,5 +224,24 @@ def generate_lumMag(N, L_min=1e7, L_max=1e11,  L_star=1e10, alpha=-1.1, z_min=0.
         table["L"].unit = u.Lsun
         return table
     else:
-        return z, m, M, L, dL_mpc
+        return z, dL_mpc, L, M, m
 
+
+def read_lumMag_fits(outputfile, cat_ID=0, HDU='BOLOMETRIC', col_ID="Ratio_ID", col_Cat="Ratio_Cat", suffix_col="INDEX_", L_bandRatio=None, to_band=None):
+    with fitsio.FITS(outputfile) as fits:
+        data = fits[HDU]
+        header = data.read_header()
+        colnames = [header[k] for k in header.keys() if k.startswith(suffix_col)]
+        if type(cat_ID) == int:
+            idx = cat_ID
+            cat_ID = data[col_ID][idx]
+        else: idx = get_indexID(fits, cat_ID, HDU=HDU, col_ID=col_ID)[0]
+        data_Cat = data[col_Cat][idx]
+
+    table = Table(data_Cat.T, names=colnames)
+    table["dL"].unit = u.Mpc
+    table["L"].unit = u.Lsun
+    if (L_bandRatio is not None) and (to_band is not None):
+        table[f"L_{to_band}"], table[f"M_{to_band}"], table[f"m_{to_band}"] = bolom2band_LbandRatio(table['L'], table['dL'], L_bandRatio=L_bandRatio)
+        table[f"L_{to_band}"].unit = u.Lsun
+    return table, cat_ID
