@@ -32,7 +32,8 @@ def get_Cl_ccl(nside, zmin=0.1, zmax=3.0, size=400, build_nz=build_nz_model, Ome
     else: return cl
 
 
-def get_clusterContrast(cl, nside, lognormal=False):
-    m = hp.synfast(cl, nside=nside)
+def get_clusterContrast(cl, nside, lognormal=False, nest=False):
+    m = hp.synfast(cl, nside=nside)               #always return in RING (id: nest=False).
     if lognormal: m = np.exp(m - 0.5 * np.var(m)) #Log-Normale transformation
+    if nest: m = hp.reorder(m, r2n=True)
     return m
