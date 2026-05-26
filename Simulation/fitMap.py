@@ -77,18 +77,20 @@ def get_LeastSquare_plot(least_square, param, index=-2, start=0, stop=1e7, step=
     else: return ls
 
 
-def compareFit_val(df, x, y, xscale='log', yscale='linear', nsigma=1, **kwargs):
+def compareFit_val(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=True, **kwargs):
     """Plot the comparison between the measured value y and the true one depending on a study parater x, when fit results are loaded in the dataframe df."""
     x = x + "_true"
     xlabel = kwargs.pop("xlabel", x)
     ylabel = kwargs.pop("ylabel", y)
     if "figax" in kwargs.keys(): fig, ax = kwargs["figax"] #figax have to be tuple (fig, ax).
     else: fig, ax = plt.subplots()
-    
-    y_inf = df[y] - nsigma*df[y + "_err"]
-    y_sup = df[y] + nsigma*df[y + "_err"]
-    ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
-    ax.plot(df[x], df[y], label="Fit results")
+
+    if surface:
+        y_inf = df[y] - nsigma*df[y + "_err"]
+        y_sup = df[y] + nsigma*df[y + "_err"]
+        ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
+        ax.plot(df[x], df[y], label="Fit results")
+    else: ax.errorbar(df[x], df[y], yerr=df[y + "_err"], label="Fit results")
     ax.plot(df[x], df[y + "_true"], label="True value")
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -97,7 +99,7 @@ def compareFit_val(df, x, y, xscale='log', yscale='linear', nsigma=1, **kwargs):
     ax.legend()
 
 
-def compareFit_diff(df, x, y, xscale='log', yscale='linear', nsigma=1, **kwargs):
+def compareFit_diff(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=True, **kwargs):
     """Plot the difference between the measured value y and the true one depending on a study parater x, when fit results are loaded in the dataframe df."""
     x = x + "_true"
     ylegend = kwargs.pop("ylegend", y)
@@ -107,11 +109,37 @@ def compareFit_diff(df, x, y, xscale='log', yscale='linear', nsigma=1, **kwargs)
     else: fig, ax = plt.subplots()
     
     y_diff = np.abs(df[y] - df[y + "_true"])
-    y_inf = y_diff - nsigma*df[y + "_err"]
-    y_sup = y_diff + nsigma*df[y + "_err"]
-    ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
-    ax.plot(df[x], y_diff, label=f"Difference {ylegend} - {ylegend}_true")
+    if surface:
+        y_inf = y_diff - nsigma*df[y + "_err"]
+        y_sup = y_diff + nsigma*df[y + "_err"]
+        ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
+        ax.plot(df[x], y_diff, label=f"Difference {ylegend} - {ylegend}_true")
+    else: ax.errorbar(df[x], y_diff, yerr=df[y + "_err"], label=f"Difference {ylegend} - {ylegend}_true")
     ax.hlines(0, df[x].min(), df[x].max(), linestyles="--", color="orange", label="y = 0")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel);
+    ax.set_xscale(xscale)
+    ax.set_yscale(yscale)
+    ax.legend()
+
+
+def compareFit_ratio(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=True, **kwargs):
+    """Plot the difference between the measured value y and the true one depending on a study parater x, when fit results are loaded in the dataframe df."""
+    x = x + "_true"
+    ylegend = kwargs.pop("ylegend", y)
+    xlabel = kwargs.pop("xlabel", x)
+    ylabel = kwargs.pop("ylabel", f'{ylegend} / {ylegend}_true')
+    if "figax" in kwargs.keys(): fig, ax = kwargs["figax"] #figax have to be tuple (fig, ax).
+    else: fig, ax = plt.subplots()
+    
+    y_ratio = df[y] / df[y + "_true"]
+    if surface:
+        y_inf = y_ratio - nsigma*df[y + "_err"]/df[y + "_true"]
+        y_sup = y_ratio + nsigma*df[y + "_err"]/df[y + "_true"]
+        ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
+        ax.plot(df[x], y_ratio, label=f"Ratio {ylegend} / {ylegend}_true")
+    else: ax.errorbar(df[x], y_ratio, yerr=df[y + "_err"]/np.abs(df[y + "_true"]), label=f"Ratio {ylegend} / {ylegend}_true")
+    ax.hlines(1, df[x].min(), df[x].max(), linestyles="--", color="orange", label="y = 1")
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel);
     ax.set_xscale(xscale)
