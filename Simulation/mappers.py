@@ -21,7 +21,7 @@ class Mapper():
     _mapNameBase = "map" #base name for all map attributs (ex: self.map, self.mapMasked, self.mapCut...)
     _settingsPlot = {"graticule": True, #default settings to use in self.plot()
         "graticule_labels": True,
-        "xlabel": "RA", "ylabel": "DEC"}
+        "xlabel": "RA", "ylabel": "DEC", "unit_size": None}
     _settingsFit_MD = {"bounds": ([0, 0, 0, -90], [np.inf, 1, 360, 90]), #default settings to use in self.fit_dipole()
         "names": ("N*", "A", "ra", "dec")}
     _settingsFit_D = {"bounds": ([0, 0, -90], [1, 360, 90]), #default settings to use in self.fit_dipole()
@@ -93,10 +93,15 @@ class Mapper():
         - use_map = "Cut": plot self.mapCut."""
         settings = self._settingsPlot | self._instance_settingsPlot | kwargs
         xlabel, ylabel = settings.pop("xlabel"), settings.pop("ylabel")
+        unit_size = settings.pop("unit_size")
         hpmap = self._select_useMap(use_map) #choosing which attribut map to plot.
         hp.projview(hpmap, nest=self.nest, **settings)
         if xlabel: plt.xlabel(xlabel)
         if ylabel: plt.ylabel(ylabel)
+        if ('unit' in settings.keys()) and (unit_size is not None):
+            fig = plt.gcf()
+            cax = fig.get_axes()[-1]
+            cax.xaxis.label.set_size(unit_size)
 
     
     def fit_dipole(self, use_map, init, fixed=[], contrast=False, plot_map=True, fit_monop=True, **kwargs):
