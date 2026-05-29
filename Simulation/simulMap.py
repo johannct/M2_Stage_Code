@@ -29,28 +29,34 @@ def raDec2map_Table(NSIDE, table, col_RA="RA", col_DEC="DEC", **kwargs):
     return raDec2map(NSIDE, table[col_RA], table[col_DEC], **kwargs)
     
 
+def generate_raDec(N):
+    '''Return the simulated number of sources by pixel, the right-ascention and the declination, by uniformally randomizing RA and DEC, depending on the resolution NSIDE and the theorical number of sources by pixel NSource_px_th.'''
+    RA = np.random.uniform(0, 360, int(N))
+    DEC_sin = np.random.uniform(-1, 1, int(N)) #pour DEC, il faut passer par sin(DEC), compris entre -1 et 1
+    DEC = np.degrees(np.arcsin(DEC_sin))
+    return RA, DEC
+
+
 def get_raDec2map(NSIDE, NSource_px_th):
     '''Return the simulated number of sources by pixel, the right-ascention and the declination, by uniformally randomizing RA and DEC, depending on the resolution NSIDE and the theorical number of sources by pixel NSource_px_th.'''
     #RA, DEC simulation:
     NPIX = hp.nside2npix(NSIDE)
-    RA = np.random.uniform(0, 360, int(NPIX*NSource_px_th))
-    DEC_sin = np.random.uniform(-1, 1, int(NPIX*NSource_px_th)) #pour DEC, il faut passer par sin(DEC), compris entre -1 et 1
-    DEC = np.degrees(np.arcsin(DEC_sin))
+    RA, DEC = generate_raDec(int(NPIX*NSource_px_th))
 
     #Number of sources by pixel conversion:
     NSource_px = raDec2map(NSIDE, RA, DEC)
     return NSource_px, RA, DEC
 
 
-def nz_model(z):
+def nz_model(z, sigma=0.5, beta=1.5):
     """Compute the normalized distribution in redshift dependong on the redshift z."""
-    return z**2 * np.exp(-(z/0.5)**1.5)
+    return z**2 * np.exp(-(z/sigma)**beta)
 
 
-def build_nz(zmin):
-    z = np.linspace(0.01, 3.0, 400)
+def build_nz_model(zmin, zmax, size):
+    z = np.linspace(0.01, zmax, size) #to avoid Cl discontinuities at low ell.
     nz = nz_model(z)
-    nz[z < zmin] = 0
+    nz[z < zmin] = 0 #to avoid Cl discontinuities at low ell.
     nz /= np.trapz(nz, z)
     return z, nz
 
@@ -66,6 +72,17 @@ def cut_m52map(m, m5, chunk_size=1e4):
     mask = m <= m5
     result_dask = mask.sum(axis=1)
     return result_dask.compute()
+
+
+
+## Conversion functions:
+def raDec2lb(ra, dec):
+    coord = SkyCoord(ra=ra*u.degree, dec=dec*u.degree, frame="icrs")
+    return coord.galactic.l.value, coord.galactic.b.value
+
+def lb2raDec(l, b):
+    coord = SkyCoord(l=l*u.degree, b=b*u.degree, frame="galactic")
+    return coord.icrs.ra.value, coord.icrs.dec.value
 
 
 
@@ -126,6 +143,11 @@ def gauss(x,A,mu,sigma):
     return (A / (sigma*np.sqrt(2*np.pi)))* np.exp(-np.square(x-mu)/(2*sigma**2))
 
 
+def apply_monopole_Mcontrast(mapContrast, M):
+    """Return the count map, from a monopole M and a contrast map."""
+    return M*(1 + mapContrast)
+
+
 def get_pixSide(map, cut_masked=False):
     """From a map, return npix, nside, ipix."""
     npix = len(map) #nb. of pixels
@@ -160,7 +182,7 @@ def apply_dipole_ARaDec(map, A, ra, dec, nest, cut_masked=False):
 
 
 def apply_dipole_MD(map, M, D0, D1, D2, nest, frame='icrs', contrast=True, cut_masked=False):
-    """Returned the measured map, when it is modified by a a monopole M and a kinematic dipole D, depending on the true map."""
+    """Return the measured map, when it is modified by a a monopole M and a kinematic dipole D, depending on the true map."""
     if frame == 'icrs': Acostheta = apply_dipole_ARaDec(map, D0, D1, D2, nest, cut_masked)
     elif frame == 'galactic': Acostheta = apply_dipole_Alb(map, D0, D1, D2, nest, cut_masked)
     elif frame == 'cartesian':
@@ -170,3 +192,10 @@ def apply_dipole_MD(map, M, D0, D1, D2, nest, frame='icrs', contrast=True, cut_m
         Acostheta = np.dot(D, u_source)
     if contrast: return M + Acostheta
     else: return M*(1 + Acostheta)
+
+
+def renormalize(v):
+    var = v.copy()
+    var_min = var.min()
+    var_max = var.max()
+    return (var - var_min) / (var_max - var_min)

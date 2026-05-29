@@ -10,8 +10,12 @@ import matplotlib.pyplot as plt
 from iminuit import Minuit
 from iminuit.cost import LeastSquares
 
-try: from utile_fitsFile import *
-except: from Simulation.utile_fitsFile import *
+try:
+    from utile_fitsFile import *
+    from simulMap import get_savefig
+except:
+    from Simulation.utile_fitsFile import *
+    from Simulation.simulMap import get_savefig
 
 
 
@@ -47,33 +51,105 @@ def plot_fit(x_fit, y_fit, values, model, **kwargs):
     return fig, ax
 
 
-def get_LeastSquare_plot(least_square, param, index=-2, start=0, stop=1e7, step=10000, **kwargs):
+def get_LeastSquare_plot(least_square, param, index=-2, start=0, stop=1e7, step=10000, get_fig=False, **kwargs):
     '''Plot the LeastSquare function of a fit vs. param[index].'''
-    par = param.copy()
+    if type(param) == tuple: par = list(param)
+    else: par = param.copy()
     parx = np.linspace(start, stop, step)
     ls = []
     for x in parx:
         par[index] = x
         ls.append(least_square(*par))
-    
-    fig, ax = plt.subplots()
-    ax.plot(parx, ls)
-    xlabel = kwargs.get("xlabel", "param[{}]".format(index))
+
+    output_path = kwargs.pop("output_path", False) #to save the figure.
+    ext = kwargs.pop('format', 'pdf')
+    if "figax" in kwargs.keys(): fig, ax = kwargs.pop("figax") #figax have to be tuple (fig, ax).
+    else: fig, ax = plt.subplots()
+    xlabel = kwargs.pop("xlabel", "param[{}]".format(index))
+    if "title" in kwargs.keys(): ax.set_title(kwargs.pop("title"))
+    ax.plot(parx, ls, **kwargs)
     ax.set_xlabel(xlabel)
     ax.set_ylabel("$\chi_2$ function")
-    if "title" in kwargs.keys(): ax.set_title(kwargs["title"])
     
-    output_path = kwargs.get("output_path", False)
-    if output_path:
-        ext = kwargs.get('format', 'pdf')
-        get_savefig(fig=fig, output_path=output_path, sufix="chi2_vs_param{}".format(index), format=ext)
+    if output_path: get_savefig(fig=fig, output_path=output_path, sufix="chi2_vs_param{}".format(index), format=ext)
     
-    return ls
+    if get_fig: return ls, fig, ax
+    else: return ls
+
+
+def compareFit_val(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=True, **kwargs):
+    """Plot the comparison between the measured value y and the true one depending on a study parater x, when fit results are loaded in the dataframe df."""
+    x = x + "_true"
+    xlabel = kwargs.pop("xlabel", x)
+    ylabel = kwargs.pop("ylabel", y)
+    if "figax" in kwargs.keys(): fig, ax = kwargs["figax"] #figax have to be tuple (fig, ax).
+    else: fig, ax = plt.subplots()
+
+    if surface:
+        y_inf = df[y] - nsigma*df[y + "_err"]
+        y_sup = df[y] + nsigma*df[y + "_err"]
+        ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
+        ax.plot(df[x], df[y], label="Fit results")
+    else: ax.errorbar(df[x], df[y], yerr=df[y + "_err"], label="Fit results")
+    ax.plot(df[x], df[y + "_true"], label="True value")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_xscale(xscale)
+    ax.set_yscale(yscale)
+    ax.legend()
+
+
+def compareFit_diff(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=True, **kwargs):
+    """Plot the difference between the measured value y and the true one depending on a study parater x, when fit results are loaded in the dataframe df."""
+    x = x + "_true"
+    ylegend = kwargs.pop("ylegend", y)
+    xlabel = kwargs.pop("xlabel", x)
+    ylabel = kwargs.pop("ylabel", f'abs({ylegend} - {ylegend}_true)')
+    if "figax" in kwargs.keys(): fig, ax = kwargs["figax"] #figax have to be tuple (fig, ax).
+    else: fig, ax = plt.subplots()
+    
+    y_diff = np.abs(df[y] - df[y + "_true"])
+    if surface:
+        y_inf = y_diff - nsigma*df[y + "_err"]
+        y_sup = y_diff + nsigma*df[y + "_err"]
+        ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
+        ax.plot(df[x], y_diff, label=f"Difference {ylegend} - {ylegend}_true")
+    else: ax.errorbar(df[x], y_diff, yerr=df[y + "_err"], label=f"Difference {ylegend} - {ylegend}_true")
+    ax.hlines(0, df[x].min(), df[x].max(), linestyles="--", color="orange", label="y = 0")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel);
+    ax.set_xscale(xscale)
+    ax.set_yscale(yscale)
+    ax.legend()
+
+
+def compareFit_ratio(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=True, **kwargs):
+    """Plot the difference between the measured value y and the true one depending on a study parater x, when fit results are loaded in the dataframe df."""
+    x = x + "_true"
+    ylegend = kwargs.pop("ylegend", y)
+    xlabel = kwargs.pop("xlabel", x)
+    ylabel = kwargs.pop("ylabel", f'{ylegend} / {ylegend}_true')
+    if "figax" in kwargs.keys(): fig, ax = kwargs["figax"] #figax have to be tuple (fig, ax).
+    else: fig, ax = plt.subplots()
+    
+    y_ratio = df[y] / df[y + "_true"]
+    if surface:
+        y_inf = y_ratio - nsigma*df[y + "_err"]/df[y + "_true"]
+        y_sup = y_ratio + nsigma*df[y + "_err"]/df[y + "_true"]
+        ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
+        ax.plot(df[x], y_ratio, label=f"Ratio {ylegend} / {ylegend}_true")
+    else: ax.errorbar(df[x], y_ratio, yerr=df[y + "_err"]/np.abs(df[y + "_true"]), label=f"Ratio {ylegend} / {ylegend}_true")
+    ax.hlines(1, df[x].min(), df[x].max(), linestyles="--", color="orange", label="y = 1")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel);
+    ax.set_xscale(xscale)
+    ax.set_yscale(yscale)
+    ax.legend()
 
 
 
 ## Fit functions:
-def fit_minuit(x_fit, y_fit, y_err, model, init, par_name, bounds=None, fixed=[], get_fig=False, plot_fig=True, **kwargs):
+def fit_minuit(x_fit, y_fit, y_err, model, init, par_name, bounds=None, fixed=[], get_fig=False, get_cost=False, plot_fig=True, **kwargs):
     '''Fit data with iminuit and the least squares methode, and return the corresponding Minuit() instance.
     Also show the figure with both data and fit, by using plot_fit(x_fit, y_fit, values, model, **kwargs).
 
@@ -86,6 +162,7 @@ def fit_minuit(x_fit, y_fit, y_err, model, init, par_name, bounds=None, fixed=[]
 
     Optionnal parameters:
     - get_fig: if True, return also the fig, ax variables from the data&fit figure. By default, get_fig=False.
+    - get_cost: if True, return also the cost function used to the fit. By default, get_cost=False.
     '''
     verbose = kwargs.pop('verbose', True)
     weights = kwargs.pop('weights', None)
@@ -102,7 +179,12 @@ def fit_minuit(x_fit, y_fit, y_err, model, init, par_name, bounds=None, fixed=[]
 
     if plot_fig: fig, ax = plot_fit(x_fit, y_fit, m.values, model, **kwargs)
     else: get_fig = False #fig, ax only exist if plot_fig = True, so they can't be returned if plot_fig = False.
-    if get_fig: return m, fig, ax
+    result = [m]
+    if get_cost: result.append(cost_func)
+    if get_fig:
+        result.append(fig)
+        result.append(ax)
+    if len(result) > 1: return tuple(result)
     else: return m
 
 
@@ -183,9 +265,9 @@ def get_dicParam_minuit(m, mapID, add_param={}, to_pandas=True):
 
 
 def prep_df_to_fits(df):
-    """Prepare a dataframe to be saved in a fits file by adaoting some columns."""
+    """Prepare a dataframe to be saved in a fits file by adapting some columns."""
     data = df.copy()
-    data['Coord'] = data['Coord'].astype('U9')
+    if 'Coord' in data.columns: data['Coord'] = data['Coord'].astype('U9')
     for col in data.columns:
         if col.endswith('_fixed'):
             data[col].fillna(False, inplace=True)
@@ -199,7 +281,7 @@ def save_fit_minuit(dicMinuit, outputfile, HDU_target='FIT_MINUIT'):
         else:
             print(f"Coulndn't find HDU {HDU_target} in the data ; creating one.")
             fits.write(dicMinuit, extname=HDU_target)
-    print('Saving Dataframe results in {}'.format(output_file))
+    print('Saving Dataframe results in {}'.format(outputfile))
     print("Saving complete.")
 
 
@@ -209,6 +291,7 @@ def get_save_fit_dfMinuit(dfMinuit, outputfile, HDU_target='FIT_MINUIT'):
     data = fitsio.FITS(outputfile) #to avoid duplicates.
     if HDU_target in data: df = get_row_not_in(df, Table(data[HDU_target].read()))
     data.close()
+    if type(df) == pd.DataFrame: df = Table.from_pandas(df) #to be able to use as_array()
     dic = df.as_array()
     if len(dic) == 0: print(f'All the rows already exists in {HDU_target}, or empty table given. No row was saved.')
     else: save_fit_minuit(dic, outputfile, HDU_target)

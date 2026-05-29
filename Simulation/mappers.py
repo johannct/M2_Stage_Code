@@ -7,8 +7,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from astropy.table import Table, vstack, MaskedColumn
 
-try: from simulMap import raDec2map_Table
-except: from Simulation.simulMap import raDec2map_Table
+try:
+    from simulMap import raDec2map_Table, apply_dipole_MD, apply_dipole_ARaDec
+    from fitMap import fit_dipole_err
+except:
+    from Simulation.simulMap import raDec2map_Table, apply_dipole_MD, apply_dipole_ARaDec
+    from Simulation.fitMap import fit_dipole_err
 
 
 ##### Parent class to all others: ##### 
@@ -18,17 +22,34 @@ class Mapper():
     _settingsPlot = {"graticule": True, #default settings to use in self.plot()
         "graticule_labels": True,
         "xlabel": "RA", "ylabel": "DEC"}
+    _settingsFit_MD = {"bounds": ([0, 0, 0, -90], [np.inf, 1, 360, 90]), #default settings to use in self.fit_dipole()
+        "names": ("N*", "A", "ra", "dec")}
+    _settingsFit_D = {"bounds": ([0, 0, -90], [1, 360, 90]), #default settings to use in self.fit_dipole()
+        "names": ("A", "ra", "dec")}
+    _settingsFit = {"MD": _settingsFit_MD, "D": _settingsFit_D}
+    
     
     def __init__(self, data, nest: bool = True, hpmap=None, dataName="table"): #called "hpmap" rather than "map" to avoid risk to confuse with map() python function.
         self.nest = nest
         self.__dict__[dataName] = data
         if hpmap is not None: self.__dict__[self._mapNameBase] = hpmap
         self._instance_settingsPlot = {} #to create new default settings to use in self.plot(), specific to the instance.
+        #to create new default settings to use in self.fit_dipole(), specific to the instance.
+        self._instance_settingsFit_MD = {"model": lambda hpmap, M, A, ra, dec, contrast : apply_dipole_MD(hpmap, M, A, ra, dec, nest=self.nest, frame='icrs', contrast=contrast, cut_masked=True)}
+        self._instance_settingsFit_D = {"model": lambda hpmap, A, ra, dec, contrast : apply_dipole_ARaDec(hpmap, A, ra, dec, nest=self.nest, cut_masked=True)}
+        self._instance_settingsFit = {"MD": self._instance_settingsFit_MD, "D": self._instance_settingsFit_D}
 
     
     def _set_instance_settingsPlot(self, **kwargs):
         """Allow to set default settings specific to the instance self, in order to be used in self.plot()."""
         self._instance_settingsPlot = self._instance_settingsPlot | kwargs  #take values in kwargs if their exist, else take values in self._instance_settingsPlot
+
+    
+    def _set_suffixTextPlot(self, sep=" for ", **kwargs):
+        """Allow to set a suffix to texts like unit or xlabel in default settings specific to the instance self, in order to be used in self.plot()."""
+        for k, v in kwargs.items():
+            self._instance_settingsPlot[k] = (self._settingsPlot | self._instance_settingsPlot)[k]
+            self._instance_settingsPlot[k] += sep+v
         
 
     def _select_useMap(self, suffix=''):
@@ -74,31 +95,97 @@ class Mapper():
         xlabel, ylabel = settings.pop("xlabel"), settings.pop("ylabel")
         hpmap = self._select_useMap(use_map) #choosing which attribut map to plot.
         hp.projview(hpmap, nest=self.nest, **settings)
-        plt.xlabel(xlabel)
-        plt.ylabel(ylabel)
+        if xlabel: plt.xlabel(xlabel)
+        if ylabel: plt.ylabel(ylabel)
+
+    
+    def fit_dipole(self, use_map, init, fixed=[], contrast=False, plot_map=True, fit_monop=True, **kwargs):
+        """Return the result of a dipole fit. Can fit either with monopole or without."""
+        #Settings definition:
+        if fit_monop: settingsKey = "MD"
+        else: settingsKey = "D"
+        settings = self._settingsFit[settingsKey] | self._instance_settingsFit[settingsKey] | kwargs
+        defaultModel = settings.pop("model")
+        model = kwargs.get("model", lambda hpmap, *args : defaultModel(hpmap, *args, contrast=contrast))
+
+        #Map definition and fit:
+        hpmap = self._select_useMap(use_map) #choosing which attribut map to fit.
+        title_map = settings.pop("title_map", "") #title for plot()
+        if plot_map: self.plot(use_map=use_map, title = title_map)
+        if "title_fit" in settings.keys(): settings["title"] = settings["title_fit"] #title for plot_fit(); require "title" in kwargs
+        m = fit_dipole_err(model, hpmap, init, fixed=fixed, **settings)
+        return m
+
+
+    def fillna(self, from_map="", fill_value=0, to_map="Filled", inplace=True):
+        hpmap = self._select_useMap(from_map)
+        hpmap[np.isnan(hpmap)] = fill_value
+        if inplace: to_map = from_map
+        self.__dict__[self._mapNameBase + to_map] = hpmap  #not use self._create_newMap because does not allow to modify original base map.
+
+
+    def set_mapID(self, ID, inunit=True):
+        """Add an attribut ID to the instance. inunit is True, this ID will appear in the unit when plotting the map with self.plot."""
+        self.ID = ID
+        if inunit: self._set_suffixTextPlot(unit = f"Map ID : {ID}", sep="\nfor ")
+        
+        
+        
 
 
 
-##### Density map: #####
-class DensityMapper(Mapper):
-    """A class to read and manipulate density maps."""
+##### Count map: #####
+class CountMapper(Mapper):
+    """A class to read and manipulate count maps."""
     _settingsPlot = Mapper._settingsPlot | {
-        "unit": "Source density in $[\deg^{-2}]$"} #default settings to use in self.plot()
+        "unit": "Count"} #default settings to use in self.plot()
     
-    def __init__(self, data, nside: int, nest: bool = True, hpmap=None):
-        self.nside = nside
-        self.area_deg2 = hp.nside2pixarea(self.nside, degrees=True)
+    def __init__(self, data, nside: int, nest: bool = True, hpmap=None, get_grouped=False):
         super().__init__(data=data, nest=nest, hpmap=hpmap)
-        if hpmap is None: self.__dict__[self._mapNameBase] = raDec2map_Table(self.nside, self.table, nest=self.nest)/self.area_deg2
+        if hpmap is None: replace_map = True
+        else: replace_map = False
+        self.get_nside(nside=nside, replace_map=replace_map, get_grouped=get_grouped)
+
+    
+    @classmethod
+    def from_map(cls, hpmap, nest: bool = True, **kwargs):
+        """Load a map from an array or a column or anything already able to be plotted by healpy functions."""
+        data = kwargs.pop("data", None)
+        nside = hp.npix2nside(len(hpmap))
+        return cls(data=data, nside=nside, nest=nest, hpmap=hpmap, **kwargs)
     
     
-    def add(self, mapper):
+    def add(self, mapper, get_grouped: bool = False):
         """Add another DensityMapper to the instance, and return a new DensityMapper with:
         - new.map = self.map + mapper.map
         - new.table = vstack([self.table, mapper.table])"""
-        data = vstack([self.table, mapper.table])
+        if (self.table is None) or (mapper.table is None): data=None
+        else: data = vstack([self.table, mapper.table])
         hpmap = self.map + mapper.map
-        return self.__class__(data=data, nside=self.nside, nest=self.nside, hpmap=hpmap)
+        return self.__class__(data=data, nside=self.nside, nest=self.nest, hpmap=hpmap, get_grouped=get_grouped)
+
+    
+    def get_df_grouped(self, col_ipix='HealPIX', df_col=None):
+        try:
+            if df_col is None: df_col = [col for col in self.table.colnames if self.table[col].ndim == 1]
+            self.df = self.table[df_col].to_pandas()  #can only convert ndim=1 columns
+            self.df_grouped = self.df.groupby(col_ipix)
+        except: print("Could not create DataFrame from Table")
+    
+    
+    def get_nside(self, nside: int, replace_map: bool = True, get_grouped: bool = False, df_col=None):
+        #adding nside information:
+        self.nside = nside
+        self.area_deg2 = hp.nside2pixarea(self.nside, degrees=True)
+        if self.table is not None:
+            col_ipix = 'HealPIX'
+            if not col_ipix in self.table.columns: self.table[col_ipix] = hp.ang2pix(nside, self.table['RA'], self.table['DEC'], nest=self.nest, lonlat=True)
+
+        #adding DataFrames:
+        if get_grouped: self.get_df_grouped(col_ipix=col_ipix, df_col=df_col)
+
+        #adding map:
+        if replace_map: self.__dict__[self._mapNameBase] = raDec2map_Table(self.nside, self.table, nest=self.nest)
 
     
     def set_mask(self, mask=None, badval=0, **kwargs):
@@ -139,6 +226,23 @@ class DensityMapper(Mapper):
             print("Attribut map has no attribut mask. Using mask from mapMasked instead.")
             fromMap = "Masked"
         self.set_cutMask(is_in, invert=True, fromMap=fromMap, toMap=toMap)
+        
+
+
+
+##### Density map: #####
+class DensityMapper(CountMapper):
+    """A class to read and manipulate density maps."""
+    _settingsPlot = Mapper._settingsPlot | {
+        "unit": "Source density in $[\deg^{-2}]$"} #default settings to use in self.plot()
+    
+    def __init__(self, data, nside: int, nest: bool = True, hpmap=None, get_grouped=False):
+        super().__init__(data=data, nside=nside, nest=nest, hpmap=hpmap, get_grouped=get_grouped)
+    
+    
+    def get_nside(self, nside: int, replace_map: bool = True, get_grouped: bool = False, df_col=None):
+        super().get_nside(nside=nside, replace_map=replace_map, get_grouped=get_grouped, df_col=df_col)
+        if replace_map: self.__dict__[self._mapNameBase] = self.__dict__[self._mapNameBase] / self.area_deg2
 
 
 

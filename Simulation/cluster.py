@@ -2,11 +2,11 @@ import numpy as np
 import healpy as hp
 import pyccl as ccl
 
-try: from simulMap import nz_model, build_nz
-except: from Simulation.simulMap import nz_model, build_nz
+try: from simulMap import nz_model, build_nz_model
+except: from Simulation.simulMap import nz_model, build_nz_model
 
 
-def get_Cl_ccl(nside, zmin, Omega_c=0.25, Omega_b=0.05, h=0.67, sigma8=0.8, n_s=0.96, get_ell=False, cosmo=None):
+def get_Cl_ccl(nside, zmin=0.1, zmax=3.0, size=400, build_nz=build_nz_model, Omega_c=0.25, Omega_b=0.05, h=0.67, sigma8=0.8, n_s=0.96, get_ell=False, cosmo=None):
     lmax = 3*nside - 1
     if cosmo is None: cosmo = ccl.Cosmology(
         Omega_c=Omega_c,
@@ -17,7 +17,7 @@ def get_Cl_ccl(nside, zmin, Omega_c=0.25, Omega_b=0.05, h=0.67, sigma8=0.8, n_s=
     )
 
     ell = np.arange(0, lmax+1)
-    z, nz = build_nz(zmin)
+    z, nz = build_nz(zmin, zmax, size)
     bias = np.ones_like(z)  # b=1
     tracer = ccl.NumberCountsTracer(
         cosmo,
@@ -27,12 +27,13 @@ def get_Cl_ccl(nside, zmin, Omega_c=0.25, Omega_b=0.05, h=0.67, sigma8=0.8, n_s=
     )
 
     cl = ccl.angular_cl(cosmo, tracer, tracer, ell, l_limber='auto')
-    #print("Cl[ℓ=1] =", cl[0])
+    #print("Cl[ℓ=1] =", cl[1])
     if get_ell: return cl, ell
     else: return cl
 
 
-def get_clusterContrast(cl, nside, lognormal=False):
-    m = hp.synfast(cl, nside=nside)
+def get_clusterContrast(cl, nside, lognormal=False, nest=False):
+    m = hp.synfast(cl, nside=nside)               #always return in RING (id: nest=False).
     if lognormal: m = np.exp(m - 0.5 * np.var(m)) #Log-Normale transformation
+    if nest: m = hp.reorder(m, r2n=True)
     return m
