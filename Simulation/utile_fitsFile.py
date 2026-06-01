@@ -1,5 +1,6 @@
 '''A module containing several useful functions to make operation of .fits files.'''
 
+import os
 import fitsio
 import numpy as np
 import pandas as pd
@@ -16,16 +17,16 @@ def get_indexID(fits, ID, HDU='MAPS', col_ID="Map_ID"):
     return idx
     
 
-def hasID_fits(fits, ID, HDU='MAPS'):
+def hasID_fits(fits, ID, HDU='MAPS', ID_col='Map_ID'):
     """Check if an ID or a list of IDs is in the HDU of the fits.
     Return True if it is, and False if not."""
-    return np.isin(ID, fits[HDU]['Map_ID'][:])
+    return np.isin(ID, fits[HDU][ID_col][:])
 
 
-def get_ID_not_in(fits, HDU_ref ='FIT_MINUIT', HDU_target='MAPS'):
+def get_ID_not_in(fits, HDU_ref ='FIT_MINUIT', HDU_target='MAPS', ID_col='Map_ID'):
     """Return the IDs in HDU_target that are not in HDU_ref."""
-    ID_ref = fits[HDU_ref].read(columns='Map_ID')
-    ID_target = fits[HDU_target].read(columns='Map_ID')
+    ID_ref = fits[HDU_ref].read(columns=ID_col)
+    ID_target = fits[HDU_target].read(columns=ID_col)
     not_in = np.isin(ID_target, ID_ref, invert=True)
     return ID_target[not_in]
 
@@ -35,7 +36,8 @@ def get_not_in_fits_ID(df, fits, HDU='MAPS', ID_col='Map_ID'):
     """From a dataframe, return only the rows corresponding to IDs that are not already in the HDU of a fits.
     Espectially usefull to avoid saving twice the same map."""
     in_fits = hasID_fits(fits, np.array(df[ID_col]), HDU)
-    return df[~in_fits]
+    if type(df) == dict: return {k: v[~in_fits] for k, v in df.items()}
+    else: return df[~in_fits]
 
 
 def get_row_not_in(df1, df2, as_table=True):
@@ -68,6 +70,8 @@ def remove_HDU(original, clear, extNB):
                 fout.write(data, header=header, extname=name)
 
 
+## Saving functions:
 def create_primaryHDU(outputfile, header_global):
+    os.makedirs(outputfile[:outputfile.rfind('/')], exist_ok=True)
     with fitsio.FITS(outputfile, 'rw', clobber=True) as fits:
         fits.write(None, header=header_global) # None bevause Primary is empy of data

@@ -6,6 +6,7 @@ import healpy as hp
 import pandas as pd
 import matplotlib.pyplot as plt
 from astropy.table import Table, vstack, MaskedColumn
+from ulid import ULID
 
 try:
     from simulMap import raDec2map_Table, apply_dipole_MD, apply_dipole_ARaDec
@@ -133,6 +134,16 @@ class Mapper():
         """Add an attribut ID to the instance. inunit is True, this ID will appear in the unit when plotting the map with self.plot."""
         self.ID = ID
         if inunit: self._set_suffixTextPlot(unit = f"Map ID : {ID}", sep="\nfor ")
+
+
+    def get_poisson_noise(self, use_map="", IDinunit=True):
+        hpmap = self._select_useMap(use_map)
+        is_negative = hpmap < 0 #to treat contrast maps
+        new, mapID = np.random.poisson(np.abs(hpmap)), ULID()
+        new[is_negative] *= -1
+        newMapper = self.__class__.from_map(new)
+        newMapper.set_mapID(mapID, inunit=IDinunit)
+        return newMapper
         
         
         

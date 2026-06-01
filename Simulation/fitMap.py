@@ -274,7 +274,11 @@ def prep_df_to_fits(df):
     return data
 
 
-def save_fit_minuit(dicMinuit, outputfile, HDU_target='FIT_MINUIT'):
+def save_fit_minuit(dicMinuit, outputfile, HDU_target='FIT_MINUIT', header_global=None):
+    if not os.path.isfile(outputfile):
+        print(f"File {outputfile} doesn't exist ; creating one.")
+        create_primaryHDU(outputfile, header_global)
+    
     with fitsio.FITS(outputfile, 'rw') as fits: #Ouvrir le fichier en mode écriture ('rw' crée ou écrase)
         if HDU_target in fits: 
             fits[HDU_target].append(dicMinuit)
@@ -285,14 +289,46 @@ def save_fit_minuit(dicMinuit, outputfile, HDU_target='FIT_MINUIT'):
     print("Saving complete.")
 
 
-def get_save_fit_dfMinuit(dfMinuit, outputfile, HDU_target='FIT_MINUIT'):
+def get_save_fit_dfMinuit(dfMinuit, outputfile, HDU_target='FIT_MINUIT', header_global=None):
     df = dfMinuit.copy()
     df = prep_df_to_fits(df)
-    data = fitsio.FITS(outputfile) #to avoid duplicates.
-    if HDU_target in data: df = get_row_not_in(df, Table(data[HDU_target].read()))
-    data.close()
+    if os.path.isfile(outputfile):
+        data = fitsio.FITS(outputfile) #to avoid duplicates.
+        if HDU_target in data: df = get_row_not_in(df, Table(data[HDU_target].read()))
+        data.close()
     if type(df) == pd.DataFrame: df = Table.from_pandas(df) #to be able to use as_array()
     dic = df.as_array()
     if len(dic) == 0: print(f'All the rows already exists in {HDU_target}, or empty table given. No row was saved.')
-    else: save_fit_minuit(dic, outputfile, HDU_target)
+    else: save_fit_minuit(dic, outputfile, HDU_target, header_global)
     return df
+
+
+def get_dicMaps(map_IDs, maps, key_ID="Map_ID", key_map="Map"):
+    return {key_ID: np.array(map_IDs, dtype='S26'), key_map: np.array(maps)}
+
+
+def save_dicMaps(dicMaps, outputfile, HDU_target='MAPS', header_global=None):
+    if not os.path.isfile(outputfile):
+        print(f"File {outputfile} doesn't exist ; creating one.")
+        create_primaryHDU(outputfile, header_global)
+    
+    with fitsio.FITS(outputfile, 'rw') as fits: #Ouvrir le fichier en mode écriture ('rw' crée ou écrase)
+        if HDU_target in fits: 
+            fits[HDU_target].append(dicMaps)
+        else:
+            print(f"Coulndn't find HDU {HDU_target} in the data ; creating one.")
+            fits.write(dicMaps, extname=HDU_target)
+    print('Saving maps in {}'.format(outputfile))
+    print("Saving complete.")
+
+
+def get_save_dicMaps(dicMaps, outputfile, HDU_target='MAPS', header_global=None, ID_col='Map_ID'):
+    dic = dicMaps.copy()
+    if os.path.isfile(outputfile):
+        data = fitsio.FITS(outputfile) #to avoid duplicates.
+        if HDU_target in data: dic = get_not_in_fits_ID(dic, data, HDU=HDU_target, ID_col=ID_col)
+        data.close()
+    
+    if len(dic[ID_col]) == 0: print(f'All the maps already exists in {HDU_target}, or empty dict given. No map was saved.')
+    else: save_dicMaps(dic, outputfile, HDU_target=HDU_target, header_global=header_global)
+    return dic
