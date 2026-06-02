@@ -37,3 +37,4 @@ def get_clusterContrast(cl, nside, lognormal=False, nest=False):
     if lognormal: m = np.exp(m - 0.5 * np.var(m)) #Log-Normale transformation
     if nest: m = hp.reorder(m, r2n=True)
     return m
+

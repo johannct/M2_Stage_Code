@@ -52,7 +52,7 @@ def get_row_not_in(df1, df2, as_table=True):
 
 
 def remove_HDU(original, clear, extNB):
-    """Copy a fits file from original to clear by avoiding the HDY extension extNB."""
+    """Copy a fits file from original to clear by avoiding the HDU extension extNB."""
     with fitsio.FITS(original) as fin:
         with fitsio.FITS(clear, 'rw', clobber=True) as fout:
             for i in range(len(fin)):

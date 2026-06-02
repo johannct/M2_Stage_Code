@@ -268,6 +268,7 @@ def prep_df_to_fits(df):
     """Prepare a dataframe to be saved in a fits file by adapting some columns."""
     data = df.copy()
     if 'Coord' in data.columns: data['Coord'] = data['Coord'].astype('U9')
+    if data['Map_ID'].dtype == "O": data['Map_ID'] = data['Map_ID'].astype(str)
     for col in data.columns:
         if col.endswith('_fixed'):
             data[col].fillna(False, inplace=True)

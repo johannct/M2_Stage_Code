@@ -147,6 +147,7 @@ class Mapper():
         
         
         
+        
 
 
 
@@ -169,12 +170,26 @@ class CountMapper(Mapper):
         data = kwargs.pop("data", None)
         nside = hp.npix2nside(len(hpmap))
         return cls(data=data, nside=nside, nest=nest, hpmap=hpmap, **kwargs)
+
+    
+    @classmethod
+    def from_map_fits(cls, file, idx=0, ID=None, HDU='MAPS', col_ID="Map_ID", IDinunit=True, nest: bool = True, **kwargs):
+        """Load a map from a fits file."""
+        data = kwargs.pop("data", None)
+        with fitsio.FITS(file, 'rw') as fits:
+            if ID is not None: idx = get_indexID(fits, ID, HDU=HDU, col_ID=col_ID)
+            mapID, hpmap = fits[HDU][idx]
+        nside = hp.npix2nside(len(hpmap))
+        mapper = cls(data=data, nside=nside, nest=nest, hpmap=hpmap, **kwargs)
+        mapper.set_mapID(mapID, inunit=IDinunit)
+        return mapper
     
     
     def add(self, mapper, get_grouped: bool = False):
         """Add another DensityMapper to the instance, and return a new DensityMapper with:
         - new.map = self.map + mapper.map
         - new.table = vstack([self.table, mapper.table])"""
+        if self.nest != mapper.nest: mapper = mapper.invert_nest()
         if (self.table is None) or (mapper.table is None): data=None
         else: data = vstack([self.table, mapper.table])
         hpmap = self.map + mapper.map
@@ -242,6 +257,36 @@ class CountMapper(Mapper):
             print("Attribut map has no attribut mask. Using mask from mapMasked instead.")
             fromMap = "Masked"
         self.set_cutMask(is_in, invert=True, fromMap=fromMap, toMap=toMap)
+
+
+    def get_densField(self, use_map="", IDinunit=True):
+        hpmap = self._select_useMap(use_map)
+        hpmean = hpmap.mean()
+        new = hpmap / hpmean
+        newMapper = self.__class__.from_map(new)
+        newMapper._set_instance_settingsPlot(unit = "Density field")
+        if hasattr(self, 'ID'): newMapper.set_mapID(self.ID, inunit=IDinunit)
+        return newMapper
+
+
+    def get_densContrast(self, use_map="", IDinunit=True):
+        hpmap = self._select_useMap(use_map)
+        hpmean = hpmap.mean()
+        new = (hpmap - hpmean)/hpmean
+        newMapper = self.__class__.from_map(new)
+        newMapper._set_instance_settingsPlot(unit = "Density contrast")
+        if hasattr(self, 'ID'): newMapper.set_mapID(self.ID, inunit=IDinunit)
+        return newMapper
+
+
+    def invert_nest(self, IDinunit=True, **kwargs):
+        data = kwargs.pop("data", None)
+        hpmap = self._select_useMap("")
+        if self.nest: hpmap = hp.reorder(hpmap, n2r=True)
+        else: hpmap = hp.reorder(hpmap, r2n=True)
+        mapper = self.__class__(data=data, nside=self.nside, nest=not self.nest, hpmap=hpmap, **kwargs)
+        if hasattr(self, "ID"): mapper.set_mapID(self.ID, inunit=IDinunit)
+        return mapper
         
 
 
