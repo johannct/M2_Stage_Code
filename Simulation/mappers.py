@@ -130,9 +130,10 @@ class Mapper():
         self.__dict__[self._mapNameBase + to_map] = hpmap  #not use self._create_newMap because does not allow to modify original base map.
 
 
-    def set_mapID(self, ID, inunit=True):
+    def set_mapID(self, ID, inunit=True, unitSuffix=""):
         """Add an attribut ID to the instance. inunit is True, this ID will appear in the unit when plotting the map with self.plot."""
         self.ID = ID
+        if unitSuffix: self._set_suffixTextPlot(unit = unitSuffix)
         if inunit: self._set_suffixTextPlot(unit = f"Map ID : {ID}", sep="\nfor ")
 
 
@@ -173,15 +174,20 @@ class CountMapper(Mapper):
 
     
     @classmethod
-    def from_map_fits(cls, file, idx=0, ID=None, HDU='MAPS', col_ID="Map_ID", IDinunit=True, nest: bool = True, **kwargs):
+    def from_map_fits(cls, fits, idx=0, ID=None, HDU='MAPS', col_ID="Map_ID", IDinunit=True, unitSuffix="", nest: bool = True, **kwargs):
+        """Load a map from a fits data."""
+        if ID is not None: idx = get_indexID(fits, ID, HDU=HDU, col_ID=col_ID)
+        mapID, hpmap = fits[HDU][idx]
+        mapper = cls.from_map(hpmap, nest, **kwargs)
+        mapper.set_mapID(mapID, inunit=IDinunit, unitSuffix=unitSuffix)
+        return mapper
+        
+    
+    @classmethod
+    def read_map_fits(cls, file, idx=0, ID=None, HDU='MAPS', col_ID="Map_ID", IDinunit=True, unitSuffix="", nest: bool = True, **kwargs):
         """Load a map from a fits file."""
-        data = kwargs.pop("data", None)
         with fitsio.FITS(file, 'rw') as fits:
-            if ID is not None: idx = get_indexID(fits, ID, HDU=HDU, col_ID=col_ID)
-            mapID, hpmap = fits[HDU][idx]
-        nside = hp.npix2nside(len(hpmap))
-        mapper = cls(data=data, nside=nside, nest=nest, hpmap=hpmap, **kwargs)
-        mapper.set_mapID(mapID, inunit=IDinunit)
+            mapper = cls.from_map_fits(fits, idx, ID, HDU, col_ID, IDinunit, unitSuffix, nest, **kwargs)
         return mapper
     
     

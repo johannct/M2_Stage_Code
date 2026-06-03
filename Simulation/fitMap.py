@@ -80,18 +80,21 @@ def get_LeastSquare_plot(least_square, param, index=-2, start=0, stop=1e7, step=
 def compareFit_val(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=True, **kwargs):
     """Plot the comparison between the measured value y and the true one depending on a study parater x, when fit results are loaded in the dataframe df."""
     x = x + "_true"
+    ytrue = kwargs.pop("ytrue", y + "_true")
     xlabel = kwargs.pop("xlabel", x)
     ylabel = kwargs.pop("ylabel", y)
-    if "figax" in kwargs.keys(): fig, ax = kwargs["figax"] #figax have to be tuple (fig, ax).
+    label_true = kwargs.pop("label_true", "True value")
+    label_fit = kwargs.pop("label_fit", "Fit results")
+    if "figax" in kwargs.keys(): fig, ax = kwargs.pop("figax") #figax have to be tuple (fig, ax).
     else: fig, ax = plt.subplots()
 
     if surface:
         y_inf = df[y] - nsigma*df[y + "_err"]
         y_sup = df[y] + nsigma*df[y + "_err"]
         ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
-        ax.plot(df[x], df[y], label="Fit results")
-    else: ax.errorbar(df[x], df[y], yerr=df[y + "_err"], label="Fit results")
-    ax.plot(df[x], df[y + "_true"], label="True value")
+        ax.plot(df[x], df[y], label=label_fit)
+    else: ax.errorbar(df[x], df[y], yerr=df[y + "_err"], label=label_fit, **kwargs)
+    ax.plot(df[x], df[ytrue], label=label_true)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_xscale(xscale)
@@ -105,7 +108,7 @@ def compareFit_diff(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=T
     ylegend = kwargs.pop("ylegend", y)
     xlabel = kwargs.pop("xlabel", x)
     ylabel = kwargs.pop("ylabel", f'abs({ylegend} - {ylegend}_true)')
-    if "figax" in kwargs.keys(): fig, ax = kwargs["figax"] #figax have to be tuple (fig, ax).
+    if "figax" in kwargs.keys(): fig, ax = kwargs.pop("figax") #figax have to be tuple (fig, ax).
     else: fig, ax = plt.subplots()
     
     y_diff = np.abs(df[y] - df[y + "_true"])
@@ -114,7 +117,7 @@ def compareFit_diff(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=T
         y_sup = y_diff + nsigma*df[y + "_err"]
         ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
         ax.plot(df[x], y_diff, label=f"Difference {ylegend} - {ylegend}_true")
-    else: ax.errorbar(df[x], y_diff, yerr=df[y + "_err"], label=f"Difference {ylegend} - {ylegend}_true")
+    else: ax.errorbar(df[x], y_diff, yerr=df[y + "_err"], label=f"Difference {ylegend} - {ylegend}_true", **kwargs)
     ax.hlines(0, df[x].min(), df[x].max(), linestyles="--", color="orange", label="y = 0")
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel);
@@ -129,7 +132,7 @@ def compareFit_ratio(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=
     ylegend = kwargs.pop("ylegend", y)
     xlabel = kwargs.pop("xlabel", x)
     ylabel = kwargs.pop("ylabel", f'{ylegend} / {ylegend}_true')
-    if "figax" in kwargs.keys(): fig, ax = kwargs["figax"] #figax have to be tuple (fig, ax).
+    if "figax" in kwargs.keys(): fig, ax = kwargs.pop("figax") #figax have to be tuple (fig, ax).
     else: fig, ax = plt.subplots()
     
     y_ratio = df[y] / df[y + "_true"]
@@ -138,7 +141,7 @@ def compareFit_ratio(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=
         y_sup = y_ratio + nsigma*df[y + "_err"]/df[y + "_true"]
         ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
         ax.plot(df[x], y_ratio, label=f"Ratio {ylegend} / {ylegend}_true")
-    else: ax.errorbar(df[x], y_ratio, yerr=df[y + "_err"]/np.abs(df[y + "_true"]), label=f"Ratio {ylegend} / {ylegend}_true")
+    else: ax.errorbar(df[x], y_ratio, yerr=df[y + "_err"]/np.abs(df[y + "_true"]), label=f"Ratio {ylegend} / {ylegend}_true", **kwargs)
     ax.hlines(1, df[x].min(), df[x].max(), linestyles="--", color="orange", label="y = 1")
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel);
@@ -246,6 +249,11 @@ def get_saveFit_minuit_csv(m, output_path, sufix, x_fit=None, y_fit=None, y_fit_
     has_name = table_param2.index.name is not None #to save the index column only if it has a name.
     table_param2.to_csv(output_file, index=has_name)
     return table_param
+
+
+def get_add_param_minuit(m, Mtrue, Atrue, ratrue, dectrue, add_param={}):
+    for k, v in zip(m.values.to_dict().keys(), (Mtrue, Atrue, ratrue, dectrue)): add_param[k + "_true"] = v
+    return add_param
 
 
 def get_dicParam_minuit(m, mapID, add_param={}, to_pandas=True):
