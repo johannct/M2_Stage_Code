@@ -105,20 +105,23 @@ def compareFit_val(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=Tr
 def compareFit_diff(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=True, **kwargs):
     """Plot the difference between the measured value y and the true one depending on a study parater x, when fit results are loaded in the dataframe df."""
     x = x + "_true"
+    ytrue = kwargs.pop("ytrue", y + "_true")
     ylegend = kwargs.pop("ylegend", y)
     xlabel = kwargs.pop("xlabel", x)
     ylabel = kwargs.pop("ylabel", f'abs({ylegend} - {ylegend}_true)')
+    label_true = kwargs.pop("label_true", "y = 0")
+    label_fit = kwargs.pop("label_fit", f"Difference {ylegend} - {ylegend}_true")
     if "figax" in kwargs.keys(): fig, ax = kwargs.pop("figax") #figax have to be tuple (fig, ax).
     else: fig, ax = plt.subplots()
     
-    y_diff = np.abs(df[y] - df[y + "_true"])
+    y_diff = np.abs(df[y] - df[ytrue])
     if surface:
         y_inf = y_diff - nsigma*df[y + "_err"]
         y_sup = y_diff + nsigma*df[y + "_err"]
         ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
-        ax.plot(df[x], y_diff, label=f"Difference {ylegend} - {ylegend}_true")
-    else: ax.errorbar(df[x], y_diff, yerr=df[y + "_err"], label=f"Difference {ylegend} - {ylegend}_true", **kwargs)
-    ax.hlines(0, df[x].min(), df[x].max(), linestyles="--", color="orange", label="y = 0")
+        ax.plot(df[x], y_diff, label=label_fit)
+    else: ax.errorbar(df[x], y_diff, yerr=df[y + "_err"], label=label_fit, **kwargs)
+    ax.hlines(0, df[x].min(), df[x].max(), linestyles="--", color="orange", label=label_true)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel);
     ax.set_xscale(xscale)
@@ -126,23 +129,53 @@ def compareFit_diff(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=T
     ax.legend()
 
 
-def compareFit_ratio(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=True, **kwargs):
-    """Plot the difference between the measured value y and the true one depending on a study parater x, when fit results are loaded in the dataframe df."""
+def compareFit_diffRatio(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=True, **kwargs):
+    """Plot the difference between the measured value y and the true one, divided by the error, depending on a study parater x, when fit results are loaded in the dataframe df."""
     x = x + "_true"
+    ytrue = kwargs.pop("ytrue", y + "_true")
     ylegend = kwargs.pop("ylegend", y)
     xlabel = kwargs.pop("xlabel", x)
-    ylabel = kwargs.pop("ylabel", f'{ylegend} / {ylegend}_true')
+    ylabel = kwargs.pop("ylabel", f'({ylegend} - {ylegend}_true)/{ylegend}_err')
+    label_true = kwargs.pop("label_true", "y = 0")
+    label_fit = kwargs.pop("label_fit", f"Difference {ylabel}")
     if "figax" in kwargs.keys(): fig, ax = kwargs.pop("figax") #figax have to be tuple (fig, ax).
     else: fig, ax = plt.subplots()
     
-    y_ratio = df[y] / df[y + "_true"]
+    y_diff = (df[y] - df[ytrue])/df[y + "_err"]
     if surface:
-        y_inf = y_ratio - nsigma*df[y + "_err"]/df[y + "_true"]
-        y_sup = y_ratio + nsigma*df[y + "_err"]/df[y + "_true"]
+        y_inf = y_diff - nsigma
+        y_sup = y_diff + nsigma
         ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
-        ax.plot(df[x], y_ratio, label=f"Ratio {ylegend} / {ylegend}_true")
-    else: ax.errorbar(df[x], y_ratio, yerr=df[y + "_err"]/np.abs(df[y + "_true"]), label=f"Ratio {ylegend} / {ylegend}_true", **kwargs)
-    ax.hlines(1, df[x].min(), df[x].max(), linestyles="--", color="orange", label="y = 1")
+        ax.plot(df[x], y_diff, label=label_fit)
+    else: ax.errorbar(df[x], y_diff, yerr=1, label=label_fit, **kwargs)
+    ax.hlines(0, df[x].min(), df[x].max(), linestyles="--", color="orange", label=label_true)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel);
+    ax.set_xscale(xscale)
+    ax.set_yscale(yscale)
+    ax.legend()
+    
+
+def compareFit_ratio(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=True, **kwargs):
+    """Plot the difference between the measured value y and the true one depending on a study parater x, when fit results are loaded in the dataframe df."""
+    x = x + "_true"
+    ytrue = kwargs.pop("ytrue", y + "_true")
+    ylegend = kwargs.pop("ylegend", y)
+    xlabel = kwargs.pop("xlabel", x)
+    ylabel = kwargs.pop("ylabel", f'{ylegend} / {ylegend}_true')
+    label_true = kwargs.pop("label_true", "y = 1")
+    label_fit = kwargs.pop("label_fit", f"Ratio {ylabel}")
+    if "figax" in kwargs.keys(): fig, ax = kwargs.pop("figax") #figax have to be tuple (fig, ax).
+    else: fig, ax = plt.subplots()
+    
+    y_ratio = df[y] / df[ytrue]
+    if surface:
+        y_inf = y_ratio - nsigma*df[y + "_err"]/df[ytrue]
+        y_sup = y_ratio + nsigma*df[y + "_err"]/df[ytrue]
+        ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
+        ax.plot(df[x], y_ratio, label=label_fit)
+    else: ax.errorbar(df[x], y_ratio, yerr=df[y + "_err"]/np.abs(df[ytrue]), label=label_fit, **kwargs)
+    ax.hlines(1, df[x].min(), df[x].max(), linestyles="--", color="orange", label=label_true)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel);
     ax.set_xscale(xscale)
@@ -198,10 +231,34 @@ def fit_dipole_err(model, map, init, names, bounds=([0, 0, -90], [1, 360, 90]), 
     
     npix = len(map) #nb. of pixels
     ipix = np.arange(npix) #indices of each pixel
-    nside= hp.npix2nside(npix)
+    nside = hp.npix2nside(npix)
 
     if fit_mode == "minuit": return fit_minuit(ipix, map, map_errY, model, init, names, list(zip(bounds[0], bounds[1])), fixed, title="Fit dipole", xlabel="Pixels", **kwargs)
     else: return curve_fit(model, ipix, map, p0=init, bounds=bounds, sigma= map_errY)
+
+
+def estimate_dipole_mle(hpmap):
+    """Reteurn the result of a dipole fit, by performing a matrix inverion."""
+    npix = len(hpmap)
+    nside = hp.npix2nside(npix)
+    if hasattr(hpmap, "mask"): w = hpmap.mask.astype(int) #to filter masked pixels
+    else: w = 1
+    theta, phi = hp.pix2ang(nside, np.arange(npix))
+
+    n_hat = np.vstack([
+        np.sin(theta)*np.cos(phi),
+        np.sin(theta)*np.sin(phi),
+        np.cos(theta)
+    ]).T
+
+    y = hpmap# / np.mean(hpmap) - 1
+
+    A = (n_hat.T * w) @ n_hat
+    b = (n_hat.T * w) @ y
+
+    d = np.linalg.solve(A, b)
+
+    return d
 
 
 
