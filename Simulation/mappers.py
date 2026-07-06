@@ -275,6 +275,18 @@ class CountMapper(Mapper):
         self.set_cutMask(is_in, invert=True, fromMap=fromMap, toMap=toMap)
 
 
+    def expand_mask(self, fromMap="Masked", toMap="Expand", npix=1):
+        """Expand a mask of npix pixels on its edges."""
+        for _ in range(npix):
+            hpmap = self._select_useMap(fromMap)
+            idx = np.where(hpmap.mask)[0] #indices of masked pixels
+            neighbours = hp.get_all_neighbours(self.nside, idx, nest=self.nest) #array of size (8, len(indices))
+            neighbours = neighbours.flatten() #array of size 8*len(indices)
+            neighbours = neighbours[neighbours != -1] #-1 corresponds to absence of neighbour
+            hpmap.mask[neighbours] = True
+        self._create_newMap(hpmap, toMap)
+
+
     def get_densField(self, use_map="", IDinunit=True):
         hpmap = self._select_useMap(use_map)
         hpmean = hpmap.mean()
