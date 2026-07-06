@@ -93,7 +93,7 @@ def compareFit_val(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=Tr
         y_sup = df[y] + nsigma*df[y + "_err"]
         ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
         ax.plot(df[x], df[y], label=label_fit)
-    else: ax.errorbar(df[x], df[y], yerr=df[y + "_err"], label=label_fit, **kwargs)
+    else: ax.errorbar(df[x], df[y], yerr=df[y + "_err"], label=label_fit, linestyle="", marker='o', **kwargs)
     ax.plot(df[x], df[ytrue], label=label_true)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -120,7 +120,7 @@ def compareFit_diff(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=T
         y_sup = y_diff + nsigma*df[y + "_err"]
         ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
         ax.plot(df[x], y_diff, label=label_fit)
-    else: ax.errorbar(df[x], y_diff, yerr=df[y + "_err"], label=label_fit, **kwargs)
+    else: ax.errorbar(df[x], y_diff, yerr=df[y + "_err"], label=label_fit, linestyle="", marker='o', **kwargs)
     ax.hlines(0, df[x].min(), df[x].max(), linestyles="--", color="orange", label=label_true)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel);
@@ -147,7 +147,9 @@ def compareFit_diffRatio(df, x, y, xscale='log', yscale='linear', nsigma=1, surf
         y_sup = y_diff + nsigma
         ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
         ax.plot(df[x], y_diff, label=label_fit)
-    else: ax.errorbar(df[x], y_diff, yerr=1, label=label_fit, **kwargs)
+    else:
+        ax.plot(df[x], y_diff, label=label_fit, linestyle="", marker='o', **kwargs)
+        ax.fill_between(df[x], [-1]*len(df), [1]*len(df), alpha=0.5, color='grey', label="68% confidence surface")
     ax.hlines(0, df[x].min(), df[x].max(), linestyles="--", color="orange", label=label_true)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel);
@@ -174,7 +176,7 @@ def compareFit_ratio(df, x, y, xscale='log', yscale='linear', nsigma=1, surface=
         y_sup = y_ratio + nsigma*df[y + "_err"]/df[ytrue]
         ax.fill_between(df[x], y_inf, y_sup, alpha=0.5, label=f"Error surface to {nsigma}$\sigma$")
         ax.plot(df[x], y_ratio, label=label_fit)
-    else: ax.errorbar(df[x], y_ratio, yerr=df[y + "_err"]/np.abs(df[ytrue]), label=label_fit, **kwargs)
+    else: ax.errorbar(df[x], y_ratio, yerr=df[y + "_err"]/np.abs(df[ytrue]), label=label_fit, linestyle="", marker='o', **kwargs)
     ax.hlines(1, df[x].min(), df[x].max(), linestyles="--", color="orange", label=label_true)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel);
@@ -226,7 +228,7 @@ def fit_minuit(x_fit, y_fit, y_err, model, init, par_name, bounds=None, fixed=[]
 
 def fit_dipole_err(model, map, init, names, bounds=([0, 0, -90], [1, 360, 90]), fixed=[], fit_mode="minuit", **kwargs):
     """Reteurn the result of a dipole fit, depending on a model. Can use either iminuit or scipy."""
-    map_errY = np.sqrt(np.abs(map))
+    map_errY = kwargs.pop("map_errY", np.sqrt(np.abs(map)))
     if hasattr(map, "mask"): map_errY[map.mask] = np.inf #to filter masked pixels
     
     npix = len(map) #nb. of pixels

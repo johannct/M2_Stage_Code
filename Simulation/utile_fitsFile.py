@@ -14,6 +14,7 @@ def get_indexID(fits, ID, HDU='MAPS', col_ID="Map_ID"):
     if type(ID) == np.ndarray or type(ID) == list or type(ID) == tuple:
         idx = [get_indexID(fits, id, HDU) for id in ID]
     else: idx = fits[HDU].where(f'{col_ID} == "{ID}"')
+    if len(idx) == 1: idx = idx[0]
     return idx
     
 
@@ -23,10 +24,13 @@ def hasID_fits(fits, ID, HDU='MAPS', ID_col='Map_ID'):
     return np.isin(ID, fits[HDU][ID_col][:])
 
 
-def get_ID_not_in(fits, HDU_ref ='FIT_MINUIT', HDU_target='MAPS', ID_col='Map_ID'):
+def get_ID_not_in(fits, HDU_ref ='FIT_MINUIT', HDU_target='MAPS', ID_col='Map_ID', **kwargs):
     """Return the IDs in HDU_target that are not in HDU_ref."""
+    fits_target = kwargs.get("fits_target", fits)
+    ID_col_target = kwargs.get('ID_col_target', ID_col)
+    
     ID_ref = fits[HDU_ref].read(columns=ID_col)
-    ID_target = fits[HDU_target].read(columns=ID_col)
+    ID_target = fits_target[HDU_target].read(columns=ID_col_target)
     not_in = np.isin(ID_target, ID_ref, invert=True)
     return ID_target[not_in]
 

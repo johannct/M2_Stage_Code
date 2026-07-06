@@ -11,9 +11,11 @@ from ulid import ULID
 try:
     from simulMap import raDec2map_Table, apply_dipole_MD, apply_dipole_ARaDec
     from fitMap import fit_dipole_err
+    from utile_fitsFile import get_indexID
 except:
     from Simulation.simulMap import raDec2map_Table, apply_dipole_MD, apply_dipole_ARaDec
     from Simulation.fitMap import fit_dipole_err
+    from Simulation.utile_fitsFile import get_indexID
 
 
 ##### Parent class to all others: ##### 
@@ -39,6 +41,7 @@ class Mapper():
         self._instance_settingsFit_MD = {"model": lambda hpmap, M, A, ra, dec, contrast : apply_dipole_MD(hpmap, M, A, ra, dec, nest=self.nest, frame='icrs', contrast=contrast, cut_masked=True)}
         self._instance_settingsFit_D = {"model": lambda hpmap, A, ra, dec, contrast : apply_dipole_ARaDec(hpmap, A, ra, dec, nest=self.nest, cut_masked=True)}
         self._instance_settingsFit = {"MD": self._instance_settingsFit_MD, "D": self._instance_settingsFit_D}
+        self._get_map_errY = lambda hpmap: np.sqrt(np.abs(hpmap))
 
     
     def _set_instance_settingsPlot(self, **kwargs):
@@ -116,10 +119,11 @@ class Mapper():
 
         #Map definition and fit:
         hpmap = self._select_useMap(use_map) #choosing which attribut map to fit.
+        map_errY = kwargs.pop("map_errY", self._get_map_errY(hpmap))
         title_map = settings.pop("title_map", "") #title for plot()
         if plot_map: self.plot(use_map=use_map, title = title_map)
         if "title_fit" in settings.keys(): settings["title"] = settings["title_fit"] #title for plot_fit(); require "title" in kwargs
-        m = fit_dipole_err(model, hpmap, init, fixed=fixed, **settings)
+        m = fit_dipole_err(model, hpmap, init, fixed=fixed, map_errY=map_errY, **settings)
         return m
 
 
@@ -145,6 +149,12 @@ class Mapper():
         newMapper = self.__class__.from_map(new)
         newMapper.set_mapID(mapID, inunit=IDinunit)
         return newMapper
+
+
+    def anafast(self, use_map: str = '', **kwargs):
+        hpmap = self._select_useMap(use_map)
+        if self.nest: hpmap = hp.reorder(hpmap, n2r=True)
+        return hp.anafast(hpmap, **kwargs)
         
         
         
@@ -310,6 +320,8 @@ class DensityMapper(CountMapper):
     def get_nside(self, nside: int, replace_map: bool = True, get_grouped: bool = False, df_col=None):
         super().get_nside(nside=nside, replace_map=replace_map, get_grouped=get_grouped, df_col=df_col)
         if replace_map: self.__dict__[self._mapNameBase] = self.__dict__[self._mapNameBase] / self.area_deg2
+
+
 
 
 

@@ -60,3 +60,49 @@ class Generator():
         if unit is not None: monopMapper._set_instance_settingsPlot(unit=unit)
         if hasattr(contrastMapper, 'ID'): monopMapper.set_mapID(contrastMapper.ID, inunit=IDinunit)
         return monopMapper
+
+
+    def generate_m5Ratio(self, countMapper, Nth, unit=None):
+        hpmap = countMapper._select_useMap("")/Nth
+        ratioMapper = CountMapper.from_map(hpmap)
+        if unit is not None: ratioMapper._set_instance_settingsPlot(unit=unit)
+        ratioMapper.set_mask()
+        return ratioMapper
+    
+    
+    def generate_m5Detect(self, sourceMapper, ratioMapper, unit=None):
+        hpmap = sourceMapper._select_useMap("") * ratioMapper._select_useMap("")
+        detectMapper = CountMapper.from_map(hpmap, nest=self.nest)
+        if unit is not None: detectMapper._set_instance_settingsPlot(unit=unit)
+        detectMapper.set_mask()
+        return detectMapper
+    
+    
+    def generate_m5Observ(self, detectMapper, ratioMapper, contrastMapper=None, poissNoise=True, unit=None, IDinunit=True):
+        if contrastMapper is not None: observMapper = self.generate_monopole(detectMapper._select_useMap(""), contrastMapper)
+        else: observMapper = CountMapper.from_map(detectMapper._select_useMap(""))
+        if poissNoise: observMapper = observMapper.get_poisson_noise(IDinunit=IDinunit)
+        if unit is not None: observMapper._set_instance_settingsPlot(unit=unit)
+        hpmapMasked = detectMapper._select_useMap('Masked')
+        observMapper.set_mask(hpmapMasked.mask)
+
+        model_1 = observMapper._instance_settingsFit_MD["model"]
+        model_2 = observMapper._instance_settingsFit_D["model"]
+        observMapper._instance_settingsFit_MD["model"] = lambda hpmap, M, A, ra, dec, contrast : model_1(hpmap, M, A, ra, dec, contrast) * ratioMapper._select_useMap("Masked")
+        observMapper._instance_settingsFit_D["model"] = lambda hpmap, A, ra, dec, contrast : model_2(hpmap, A, ra, dec, contrast) * ratioMapper._select_useMap("Masked")
+        
+        return observMapper
+
+
+    def generate_m5Correct(self, observMapper, ratioMapper, unit=None, IDinunit=True):
+        hpmap = observMapper._select_useMap("") / ratioMapper._select_useMap("")
+        correctMapper = CountMapper.from_map(hpmap, nest=self.nest)
+        correctMapper.fillna()
+        if unit is not None: correctMapper._set_instance_settingsPlot(unit=unit)
+        if hasattr(observMapper, 'ID'): correctMapper.set_mapID(observMapper.ID, inunit=IDinunit)
+        correctMapper.set_mask()
+        errmodel = correctMapper._get_map_errY
+        correctMapper._get_map_errY = lambda hpmap: errmodel(hpmap) / np.sqrt(ratioMapper._select_useMap("Masked"))
+        return correctMapper
+
+    
