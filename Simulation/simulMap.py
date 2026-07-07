@@ -15,18 +15,20 @@ from astropy.coordinates import SkyCoord
 ### Functions definition:
 
 ## Simulation functions:
-def raDec2map(NSIDE, RA, DEC, **kwargs):
+def raDec2map(NSIDE, RA, DEC, weights=None, **kwargs):
     '''Return the number of sources by pixel, depending on the resolution, the right-ascention RA and the declination DEC.'''
     NPIX = hp.nside2npix(NSIDE)
     NSource_px = hp.ang2pix(NSIDE, RA, DEC, lonlat=True, **kwargs)
-    NSource_px = np.bincount(NSource_px, minlength=NPIX)
+    NSource_px = np.bincount(NSource_px, minlength=NPIX, weights=weights)
     return NSource_px
 
 
-def raDec2map_Table(NSIDE, table, col_RA="RA", col_DEC="DEC", **kwargs):
+def raDec2map_Table(NSIDE, table, col_RA="RA", col_DEC="DEC", col_weights='', **kwargs):
     '''Return the number of sources by pixel, depending on the resolution, and a table or a dataframe having right-ascention and declination in its colums.
     col_RA and col_DEC allow to precise the names of these columns; by default: col_RA="RA", col_DEC="DEC"'''
-    return raDec2map(NSIDE, table[col_RA], table[col_DEC], **kwargs)
+    if col_weights: weights = table[col_weights]
+    else: weights = None
+    return raDec2map(NSIDE, table[col_RA], table[col_DEC], weights=weights, **kwargs)
     
 
 def generate_raDec(N):

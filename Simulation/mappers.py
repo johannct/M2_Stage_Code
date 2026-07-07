@@ -168,11 +168,11 @@ class CountMapper(Mapper):
     _settingsPlot = Mapper._settingsPlot | {
         "unit": "Count"} #default settings to use in self.plot()
     
-    def __init__(self, data, nside: int, nest: bool = True, hpmap=None, get_grouped=False):
+    def __init__(self, data, nside: int, nest: bool = True, hpmap=None, get_grouped=False, **kwargs):
         super().__init__(data=data, nest=nest, hpmap=hpmap)
         if hpmap is None: replace_map = True
         else: replace_map = False
-        self.get_nside(nside=nside, replace_map=replace_map, get_grouped=get_grouped)
+        self.get_nside(nside=nside, replace_map=replace_map, get_grouped=get_grouped, **kwargs)
 
     
     @classmethod
@@ -220,19 +220,19 @@ class CountMapper(Mapper):
         except: print("Could not create DataFrame from Table")
     
     
-    def get_nside(self, nside: int, replace_map: bool = True, get_grouped: bool = False, df_col=None):
+    def get_nside(self, nside: int, replace_map: bool = True, get_grouped: bool = False, df_col=None, col_RA="RA", col_DEC="DEC", col_weights=''):
         #adding nside information:
         self.nside = nside
         self.area_deg2 = hp.nside2pixarea(self.nside, degrees=True)
         if self.table is not None:
             col_ipix = 'HealPIX'
-            if not col_ipix in self.table.columns: self.table[col_ipix] = hp.ang2pix(nside, self.table['RA'], self.table['DEC'], nest=self.nest, lonlat=True)
+            if not col_ipix in self.table.columns: self.table[col_ipix] = hp.ang2pix(nside, self.table[col_RA], self.table[col_DEC], nest=self.nest, lonlat=True)
 
         #adding DataFrames:
         if get_grouped: self.get_df_grouped(col_ipix=col_ipix, df_col=df_col)
 
         #adding map:
-        if replace_map: self.__dict__[self._mapNameBase] = raDec2map_Table(self.nside, self.table, nest=self.nest)
+        if replace_map: self.__dict__[self._mapNameBase] = raDec2map_Table(self.nside, self.table, nest=self.nest, col_RA=col_RA, col_DEC=col_DEC, col_weights=col_weights)
 
     
     def set_mask(self, mask=None, badval=0, **kwargs):
@@ -325,12 +325,12 @@ class DensityMapper(CountMapper):
     _settingsPlot = Mapper._settingsPlot | {
         "unit": "Source density in $[\deg^{-2}]$"} #default settings to use in self.plot()
     
-    def __init__(self, data, nside: int, nest: bool = True, hpmap=None, get_grouped=False):
-        super().__init__(data=data, nside=nside, nest=nest, hpmap=hpmap, get_grouped=get_grouped)
+    def __init__(self, data, nside: int, nest: bool = True, hpmap=None, get_grouped=False, **kwargs):
+        super().__init__(data=data, nside=nside, nest=nest, hpmap=hpmap, get_grouped=get_grouped, **kwargs)
     
     
-    def get_nside(self, nside: int, replace_map: bool = True, get_grouped: bool = False, df_col=None):
-        super().get_nside(nside=nside, replace_map=replace_map, get_grouped=get_grouped, df_col=df_col)
+    def get_nside(self, nside: int, replace_map: bool = True, get_grouped: bool = False, df_col=None, **kwargs):
+        super().get_nside(nside=nside, replace_map=replace_map, get_grouped=get_grouped, df_col=df_col, **kwargs)
         if replace_map: self.__dict__[self._mapNameBase] = self.__dict__[self._mapNameBase] / self.area_deg2
 
 
