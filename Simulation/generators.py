@@ -105,4 +105,29 @@ class Generator():
         correctMapper._get_map_errY = lambda hpmap: errmodel(hpmap) / np.sqrt(ratioMapper._select_useMap("Masked"))
         return correctMapper
 
+
+    def alm2map(self, alms, **kwargs):
+        hpmap = hp.alm2map(alms, nside=self.nside, **kwargs)
+        mapper = CountMapper.from_map(hpmap, nest = False)
+        if self.nest: mapper = mapper.invert_nest()
+        return mapper
+
+
+    def generate_blindedMap(self, mapper, use_map: str = '', alm: bool = True, IDinunit=True, scaleFactor=2, **kwargs):
+        cl, alms = mapper.anafast(alm=True, use_map=use_map, **kwargs)
+        lmax = hp.Alm.getlmax(len(alms))
+        idx1, idx0, idx_1 = hp.Alm.getidx(lmax, 1, 1), hp.Alm.getidx(lmax, 1, 0), hp.Alm.getidx(lmax, 1, -1)
+        alms10_1 = np.array(alms[[idx1, idx0, idx_1]])
+        almsOrigin = [alms10_1.real, alms10_1.imag]
+        
+        anew, ID = np.random.normal(almsOrigin, scale = scaleFactor*np.abs(almsOrigin)), ULID()
+        anew = anew[0] + 1j*anew[1]
+        almsNew = alms.copy()
+        almsNew[[idx1, idx0, idx_1]] = anew
+        
+        newMapper = self.alm2map(almsNew, **kwargs)
+        newMapper.set_mapID(ID, inunit=IDinunit)
+        if alm: return newMapper, almsNew
+        else: return newMapper
+
     
