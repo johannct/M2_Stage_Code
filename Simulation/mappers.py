@@ -158,7 +158,6 @@ class Mapper():
         
         
         
-        
 
 
 
@@ -315,6 +314,18 @@ class CountMapper(Mapper):
         mapper = self.__class__(data=data, nside=self.nside, nest=not self.nest, hpmap=hpmap, **kwargs)
         if hasattr(self, "ID"): mapper.set_mapID(self.ID, inunit=IDinunit)
         return mapper
+
+
+    def rescale(self, ymin, ymax, use_map='', **kwargs):
+        hpmap = self._select_useMap(use_map)
+        if hasattr(hpmap, "mask"):
+            hpmap_not_masked = hpmap[~hpmap.mask]
+            new_not_masked = np.interp(hpmap_not_masked, [hpmap_not_masked.min(), hpmap_not_masked.max()], [ymin, ymax])
+            new = hpmap.copy()
+            new[~new.mask] = new_not_masked
+            new = new.data
+        else: new =  np.interp(hpmap, [hpmap.min(), hpmap.max()], [ymin, ymax])
+        return self.from_map(new, nest=self.nest, **kwargs)
         
 
 
