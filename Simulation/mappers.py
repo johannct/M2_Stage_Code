@@ -155,6 +155,12 @@ class Mapper():
         hpmap = self._select_useMap(use_map)
         if self.nest: hpmap = hp.reorder(hpmap, n2r=True)
         return hp.anafast(hpmap, **kwargs)
+
+
+    def reindex_series(self, series, **kwargs):
+        data = series.copy()
+        IDpix = pd.Index(np.arange(hp.nside2npix(self.nside)))
+        return  data.reindex(IDpix, **kwargs)
         
         
         
